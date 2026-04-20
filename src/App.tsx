@@ -31,6 +31,34 @@ import type { FaceBox } from './services/mediaPipeFaceDetection'
 
 type UserRole = 'patient' | 'caretaker'
 type FaceDetectionApi = typeof import('./services/mediaPipeFaceDetection')
+type BrowserSpeechRecognitionResult = {
+  transcript: string
+}
+type BrowserSpeechRecognitionEvent = {
+  resultIndex: number
+  results: ArrayLike<{
+    isFinal: boolean
+    [index: number]: BrowserSpeechRecognitionResult
+  }>
+}
+type BrowserSpeechRecognition = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition
+
+declare global {
+  interface Window {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor
+  }
+}
 
 type FaceAnchor = {
   left: number
@@ -52,6 +80,15 @@ function getLiveCaption(interimTranscript: string, finalTranscript: string) {
   const words = liveSpeech.trim().split(/\s+/).filter(Boolean)
 
   return words.slice(-10).join(' ')
+}
+
+function getBrowserSpeechRecognition() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition
+}
+
+async function requestMicPermission() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  stream.getTracks().forEach((track) => track.stop())
 }
 
 async function captureVideoFile(video: HTMLVideoElement, prefix: string) {
@@ -178,6 +215,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const captionEnabledRef = useRef(false)
   const nativePartialResultsRef = useRef<PluginListenerHandle | null>(null)
   const nativeListeningStateRef = useRef<PluginListenerHandle | null>(null)
+  const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const browserRestartTimerRef = useRef<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
@@ -323,6 +362,10 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   useEffect(
     () => () => {
       captionEnabledRef.current = false
+      browserRecognitionRef.current?.stop()
+      if (browserRestartTimerRef.current) {
+        window.clearTimeout(browserRestartTimerRef.current)
+      }
       WebSpeechRecognition.stopListening()
       NativeSpeechRecognition.stop().catch(() => undefined)
       NativeSpeechRecognition.removeAllListeners().catch(() => undefined)
@@ -400,14 +443,62 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   }
 
   async function startWebCaptions() {
-    if (!webSpeech.browserSupportsSpeechRecognition) {
+    const BrowserSpeechRecognition = getBrowserSpeechRecognition()
+
+    if (!BrowserSpeechRecognition && !webSpeech.browserSupportsSpeechRecognition) {
       setMicEnabled(false)
       setMicStatus('CC unavailable in this browser')
       return false
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    stream.getTracks().forEach((track) => track.stop())
+    await requestMicPermission()
+
+    if (BrowserSpeechRecognition) {
+      browserRecognitionRef.current?.stop()
+
+      const recognition = new BrowserSpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+      recognition.onresult = (event) => {
+        let interimTranscript = ''
+        let finalTranscript = ''
+
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index]
+          const transcript = result[0]?.transcript ?? ''
+
+          if (result.isFinal) {
+            finalTranscript += transcript
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        const text = getLiveCaption(interimTranscript, finalTranscript)
+
+        if (text) {
+          setCaptionText(text)
+        }
+      }
+      recognition.onerror = () => {
+        setMicEnabled(false)
+        setMicStatus('Tap mic to restart CC')
+      }
+      recognition.onend = () => {
+        if (!captionEnabledRef.current || document.visibilityState !== 'visible') {
+          return
+        }
+
+        browserRestartTimerRef.current = window.setTimeout(() => {
+          recognition.start()
+        }, 350)
+      }
+      browserRecognitionRef.current = recognition
+      recognition.start()
+
+      return true
+    }
 
     await WebSpeechRecognition.startListening({
       continuous: false,
@@ -453,6 +544,12 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       return
     }
 
+    browserRecognitionRef.current?.stop()
+    browserRecognitionRef.current = null
+    if (browserRestartTimerRef.current) {
+      window.clearTimeout(browserRestartTimerRef.current)
+      browserRestartTimerRef.current = null
+    }
     WebSpeechRecognition.stopListening()
   }
 
@@ -468,6 +565,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     if (
       isNativeApp ||
+      browserRecognitionRef.current ||
       !micEnabled ||
       webSpeech.listening ||
       !webSpeech.browserSupportsSpeechRecognition
