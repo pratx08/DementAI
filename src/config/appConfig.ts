@@ -1,3 +1,6 @@
+const assetPath = (path: string) =>
+  `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+
 export const appConfig = {
   camera: {
     width: 960,
@@ -5,17 +8,18 @@ export const appConfig = {
     frameRate: 60,
   },
   recognition: {
-    humanModelPath: '/human-models',
-    knownFacesPath: '/data/knownFaces.json',
+    humanModelPath: assetPath('human-models'),
+    knownFacesPath: assetPath('data/knownFaces.json'),
     peopleStorageKey: 'dementai-known-people',
     minRecognitionIntervalMs: 2200,
     minTrackingIntervalMs: 120,
     matchSimilarityThreshold: 0.5,
   },
   mediaPipe: {
-    wasmPath: '/mediapipe/wasm',
-    faceDetectorModelPath:
-      '/mediapipe/models/blaze_face_short_range.tflite',
+    wasmPath: assetPath('mediapipe/wasm'),
+    faceDetectorModelPath: assetPath(
+      'mediapipe/models/blaze_face_short_range.tflite',
+    ),
   },
   map: {
     destinationLabel: 'Clark University',

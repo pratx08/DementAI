@@ -604,7 +604,11 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
       setSummary('')
       setStatus(`${profile.name} is ready for patient camera recognition.`)
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not add this person.')
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'Could not add this person. Try another clear, front-facing photo.',
+      )
     } finally {
       setIsSaving(false)
     }
