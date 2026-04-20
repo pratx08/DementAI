@@ -159,6 +159,8 @@ button {
   min-height: 36px;
   padding: 7px 11px;
   color: rgba(248, 255, 250, 0.9);
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .microphone-toggle {
@@ -168,9 +170,10 @@ button {
   z-index: 7;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 7px 11px;
+  justify-content: center;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
   color: rgba(248, 255, 250, 0.9);
 }
 
@@ -644,6 +647,20 @@ button {
     left 120ms linear;
 }
 
+.tracked-identity-card::after {
+  position: absolute;
+  top: 28px;
+  right: -9px;
+  width: 16px;
+  height: 16px;
+  border-top: 1px solid rgba(230, 255, 238, 0.28);
+  border-right: 1px solid rgba(230, 255, 238, 0.28);
+  background: rgba(7, 12, 10, 0.5);
+  content: "";
+  transform: rotate(45deg);
+  backdrop-filter: blur(18px);
+}
+
 .identity-card header {
   padding: 16px 18px 14px;
   border-bottom: 1px solid rgba(224, 255, 235, 0.22);
@@ -893,12 +910,12 @@ button {
 
   .camera-flip {
     top: 12px;
-    right: 12px;
+    right: 86px;
   }
 
   .microphone-toggle {
     top: 58px;
-    right: 12px;
+    right: 98px;
   }
 
   .corner-guide {
@@ -913,7 +930,7 @@ button {
 
   .bottom-left,
   .bottom-right {
-    bottom: 96px;
+    bottom: 12px;
   }
 
   .top-left,
@@ -926,10 +943,8 @@ button {
     right: 12px;
   }
 
-  .identity-card,
-  .tracked-identity-card {
+  .identity-card {
     top: auto;
-    right: 12px;
     bottom: 104px;
     left: 12px;
     width: auto;
@@ -937,34 +952,44 @@ button {
     overflow: auto;
   }
 
+  .tracked-identity-card {
+    top: var(--face-card-top);
+    right: auto;
+    bottom: auto;
+    left: var(--face-card-left);
+    width: min(230px, calc(100% - var(--face-card-left) - 92px));
+    max-height: min(54svh, 220px);
+    overflow: visible;
+  }
+
   .identity-card header {
-    padding: 12px 14px 10px;
+    padding: 10px 12px 8px;
   }
 
   .identity-card > p {
-    padding: 12px 14px 14px;
-    font-size: 0.9rem;
-    line-height: 1.45;
+    padding: 10px 12px 12px;
+    font-size: 0.82rem;
+    line-height: 1.36;
   }
 
   .action-rail {
-    top: auto;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: auto;
-    transform: none;
+    top: 50%;
+    right: 10px;
+    bottom: auto;
+    left: auto;
+    grid-template-columns: 1fr;
+    width: 66px;
+    transform: translateY(-50%);
   }
 
   .action-rail button {
-    min-height: 62px;
+    min-height: 58px;
   }
 
   .captions,
   .microphone-status {
-    bottom: 88px;
-    max-width: calc(100% - 24px);
+    bottom: 12px;
+    max-width: calc(100% - 96px);
   }
 
   .camera-start-card {
@@ -972,12 +997,12 @@ button {
   }
 
   .map-layer {
-    top: auto;
-    right: 12px;
-    bottom: 88px;
+    top: 56px;
+    right: 86px;
+    bottom: 12px;
     left: 12px;
     width: auto;
-    height: min(42svh, 280px);
+    height: auto;
   }
 }
 
@@ -1030,7 +1055,7 @@ button {
 @media (max-height: 560px) {
   .identity-card,
   .tracked-identity-card {
-    max-height: 46svh;
+    max-height: 48svh;
   }
 
   .captions {
@@ -1057,13 +1082,20 @@ button {
     min-height: 54px;
   }
 
-  .identity-card,
-  .tracked-identity-card {
+  .identity-card {
     top: 52px;
     right: 84px;
     bottom: auto;
     left: 12px;
     max-height: calc(100% - 72px);
+  }
+
+  .tracked-identity-card {
+    top: var(--face-card-top);
+    right: auto;
+    bottom: auto;
+    left: var(--face-card-left);
+    max-height: min(54svh, 220px);
   }
 
   .captions {

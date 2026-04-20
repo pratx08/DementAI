@@ -10,7 +10,6 @@ import {
   Mic,
   MicOff,
   MapPin,
-  RefreshCw,
   Upload,
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
@@ -100,18 +99,19 @@ function mapFaceBoxToFrame(
   const boxLeft = offsetX + box.x * scale
   const boxTop = offsetY + box.y * scale
   const boxWidth = box.width * scale
+  const boxHeight = box.height * scale
   const displayedLeft = isMirrored ? frameWidth - boxLeft - boxWidth : boxLeft
   const cardWidth = Math.min(280, Math.max(210, frameWidth * 0.3))
-  const leftOfHead = displayedLeft - cardWidth - 14
-  const fallbackRight = displayedLeft + boxWidth + 14
-  const left =
-    leftOfHead >= 14
-      ? leftOfHead
-      : Math.min(Math.max(fallbackRight, 14), frameWidth - cardWidth - 14)
+  const rightRailSpace = frameWidth <= 720 ? 86 : 18
+  const leftOfHead = displayedLeft - cardWidth - 16
+  const left = Math.min(
+    Math.max(leftOfHead, 14),
+    frameWidth - cardWidth - rightRailSpace,
+  )
 
   return {
     left,
-    top: Math.min(Math.max(boxTop, 14), frameHeight - 90),
+    top: Math.min(Math.max(boxTop + boxHeight * 0.16, 14), frameHeight - 120),
   }
 }
 
@@ -196,6 +196,20 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     resetTranscript,
   } = useSpeechRecognition()
   const latestCaption = getLiveCaption(interimTranscript, finalTranscript)
+  const captionText = latestCaption || (listening ? 'CC on' : '')
+
+  useEffect(() => {
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: OrientationLockType) => Promise<void>
+      unlock?: () => void
+    }
+
+    orientation.lock?.('landscape').catch(() => undefined)
+
+    return () => {
+      orientation.unlock?.()
+    }
+  }, [])
 
   useEffect(() => {
     faceAnchorRef.current = faceAnchor
@@ -449,7 +463,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           onClick={flipCamera}
           aria-label="Flip camera"
         >
-          <RefreshCw size={17} />
           {facingMode === 'user' ? 'Front' : 'Rear'}
         </button>
 
@@ -461,7 +474,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           aria-label={listening ? 'Pause microphone' : 'Start microphone'}
         >
           {listening ? <Mic size={17} /> : <MicOff size={17} />}
-          {listening ? 'Listening' : 'Mic'}
         </button>
 
         {recognized && faceAnchor && (
@@ -520,13 +532,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           </button>
         </nav>
 
-        {browserSupportsSpeechRecognition && latestCaption && (
+        {browserSupportsSpeechRecognition && captionText && (
           <section className="captions" aria-live="polite">
-            <p>{latestCaption}</p>
+            <p>{captionText}</p>
           </section>
         )}
 
-        {!latestCaption && micStatus && (
+        {!captionText && micStatus && (
           <section className="microphone-status" aria-live="polite">
             <p>{micStatus}</p>
           </section>
@@ -718,7 +730,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
               onClick={flipCamera}
               aria-label="Flip camera"
             >
-              <RefreshCw size={16} />
               {facingMode === 'user' ? 'Front' : 'Rear'}
             </button>
             <button type="button" onClick={handleCapturePhoto}>
