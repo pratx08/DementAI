@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   Flag,
   Home,
+  Mic,
+  MicOff,
   MapPin,
   RefreshCw,
   Upload,
@@ -174,6 +176,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const recognitionTimerRef = useRef<number | null>(null)
   const trackingTimerRef = useRef<number | null>(null)
   const captionTimerRef = useRef<number | null>(null)
+  const microphoneStreamRef = useRef<MediaStream | null>(null)
+  const [micStatus, setMicStatus] = useState('Tap Mic to start captions')
   const destination = useMemo(
     () => ({
       label: appConfig.map.destinationLabel,
@@ -188,6 +192,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     interimTranscript,
     finalTranscript,
     browserSupportsSpeechRecognition,
+    listening,
     resetTranscript,
   } = useSpeechRecognition()
   const latestCaption = getLiveCaption(interimTranscript, finalTranscript)
@@ -292,20 +297,40 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
   }, [])
 
-  useEffect(() => {
-    if (!browserSupportsSpeechRecognition) {
+  useEffect(
+    () => () => {
+      SpeechRecognition.stopListening()
+      microphoneStreamRef.current?.getTracks().forEach((track) => track.stop())
+    },
+    [],
+  )
+
+  async function handleMicrophoneToggle() {
+    if (listening) {
+      SpeechRecognition.stopListening()
+      setMicStatus('Mic paused')
       return
     }
 
-    SpeechRecognition.startListening({
-      continuous: true,
-      language: 'en-US',
-    })
-
-    return () => {
-      SpeechRecognition.stopListening()
+    if (!browserSupportsSpeechRecognition) {
+      setMicStatus('Speech captions are not supported in this browser')
+      return
     }
-  }, [browserSupportsSpeechRecognition])
+
+    try {
+      microphoneStreamRef.current ??= await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      })
+
+      await SpeechRecognition.startListening({
+        continuous: true,
+        language: 'en-US',
+      })
+      setMicStatus('Listening')
+    } catch {
+      setMicStatus('Allow microphone access to use captions')
+    }
+  }
 
   useEffect(() => {
     let isCancelled = false
@@ -428,6 +453,17 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           {facingMode === 'user' ? 'Front' : 'Rear'}
         </button>
 
+        <button
+          className={`microphone-toggle ${listening ? 'is-listening' : ''}`}
+          type="button"
+          onClick={handleMicrophoneToggle}
+          aria-pressed={listening}
+          aria-label={listening ? 'Pause microphone' : 'Start microphone'}
+        >
+          {listening ? <Mic size={17} /> : <MicOff size={17} />}
+          {listening ? 'Listening' : 'Mic'}
+        </button>
+
         {recognized && faceAnchor && (
           <aside
             className="identity-card tracked-identity-card"
@@ -487,6 +523,12 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         {browserSupportsSpeechRecognition && latestCaption && (
           <section className="captions" aria-live="polite">
             <p>{latestCaption}</p>
+          </section>
+        )}
+
+        {!latestCaption && micStatus && (
+          <section className="microphone-status" aria-live="polite">
+            <p>{micStatus}</p>
           </section>
         )}
       </section>
