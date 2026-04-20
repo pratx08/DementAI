@@ -94,7 +94,8 @@ button {
 .caretaker-header button,
 .filter-row button,
 .save-person,
-.mode-back {
+.mode-back,
+.camera-flip {
   border: 1px solid rgba(237, 255, 241, 0.27);
   border-radius: 8px;
   color: #f8fff9;
@@ -124,7 +125,8 @@ button {
 .caretaker-header button:hover,
 .filter-row button:hover,
 .filter-row button[aria-pressed="true"],
-.mode-back:hover {
+.mode-back:hover,
+.camera-flip:hover {
   border-color: rgba(112, 245, 154, 0.9);
   background: rgba(22, 87, 54, 0.72);
 }
@@ -141,6 +143,19 @@ button {
   padding: 7px 11px;
   color: rgba(248, 255, 250, 0.9);
   transform: translateX(-50%);
+}
+
+.camera-flip {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 11px;
+  color: rgba(248, 255, 250, 0.9);
 }
 
 .caretaker-shell {
@@ -223,7 +238,6 @@ button {
   height: 100%;
   min-height: 210px;
   object-fit: cover;
-  transform: scaleX(-1);
 }
 
 .capture-panel p {
@@ -248,6 +262,16 @@ button {
   color: #031009;
   background: #95f2b6;
   font-weight: 900;
+}
+
+.capture-panel .capture-flip {
+  right: auto;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f8fff9;
+  background: rgba(7, 12, 10, 0.64);
 }
 
 .image-drop input {
@@ -498,6 +522,9 @@ button {
   background:
     linear-gradient(115deg, rgba(6, 9, 8, 0.9), rgba(17, 30, 24, 0.9)),
     url("https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1600&q=80");
+}
+
+.mirrored-feed {
   transform: scaleX(-1);
 }
 
@@ -818,6 +845,11 @@ button {
     top: 12px;
     left: 12px;
     transform: none;
+  }
+
+  .camera-flip {
+    top: 12px;
+    right: 12px;
   }
 
   .corner-guide {

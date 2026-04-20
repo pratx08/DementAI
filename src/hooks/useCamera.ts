@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { appConfig } from '../config/appConfig'
 
-export function useCamera(facingMode: 'environment' | 'user' = 'environment') {
+export type CameraFacingMode = 'environment' | 'user'
+
+export function useCamera(initialFacingMode: CameraFacingMode = 'user') {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const [facingMode, setFacingMode] =
+    useState<CameraFacingMode>(initialFacingMode)
   const [cameraStatus, setCameraStatus] = useState('Starting camera...')
   const [isCameraLive, setIsCameraLive] = useState(false)
 
@@ -12,6 +16,9 @@ export function useCamera(facingMode: 'environment' | 'user' = 'environment') {
 
     async function startCamera() {
       try {
+        setCameraStatus('Starting camera...')
+        setIsCameraLive(false)
+
         if (!navigator.mediaDevices?.getUserMedia) {
           setCameraStatus('Camera is not available in this browser')
           return
@@ -52,5 +59,18 @@ export function useCamera(facingMode: 'environment' | 'user' = 'environment') {
     }
   }, [facingMode])
 
-  return { videoRef, cameraStatus, isCameraLive }
+  function flipCamera() {
+    setFacingMode((current) =>
+      current === 'user' ? 'environment' : 'user',
+    )
+  }
+
+  return {
+    videoRef,
+    cameraStatus,
+    isCameraLive,
+    facingMode,
+    flipCamera,
+    isMirrored: facingMode === 'user',
+  }
 }

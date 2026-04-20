@@ -2,7 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import SpeechRecognition, {
   useSpeechRecognition,
 } from 'react-speech-recognition'
-import { AlertTriangle, ArrowLeft, Flag, Home, MapPin, Upload } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Flag,
+  Home,
+  MapPin,
+  RefreshCw,
+  Upload,
+} from 'lucide-react'
 import { appConfig } from './config/appConfig'
 import { DirectionsMap } from './components/DirectionsMap'
 import { useCamera } from './hooks/useCamera'
@@ -71,6 +79,7 @@ function mapFaceBoxToFrame(
   box: FaceBox,
   video: HTMLVideoElement,
   frame: HTMLElement,
+  isMirrored: boolean,
 ): FaceAnchor | null {
   const videoWidth = video.videoWidth
   const videoHeight = video.videoHeight
@@ -89,10 +98,10 @@ function mapFaceBoxToFrame(
   const boxLeft = offsetX + box.x * scale
   const boxTop = offsetY + box.y * scale
   const boxWidth = box.width * scale
-  const mirroredLeft = frameWidth - boxLeft - boxWidth
+  const displayedLeft = isMirrored ? frameWidth - boxLeft - boxWidth : boxLeft
   const cardWidth = Math.min(280, Math.max(210, frameWidth * 0.3))
-  const leftOfHead = mirroredLeft - cardWidth - 14
-  const fallbackRight = mirroredLeft + boxWidth + 14
+  const leftOfHead = displayedLeft - cardWidth - 14
+  const fallbackRight = displayedLeft + boxWidth + 14
   const left =
     leftOfHead >= 14
       ? leftOfHead
@@ -144,7 +153,14 @@ function LoginScreen({
 }
 
 function PatientExperience({ onLogout }: { onLogout: () => void }) {
-  const { videoRef, cameraStatus, isCameraLive } = useCamera()
+  const {
+    videoRef,
+    cameraStatus,
+    isCameraLive,
+    facingMode,
+    flipCamera,
+    isMirrored,
+  } = useCamera()
   const [recognized, setRecognized] = useState<KnownPersonProfile | null>(null)
   const [knownPeople, setKnownPeople] = useState<KnownPersonProfile[]>([])
   const [faceAnchor, setFaceAnchor] = useState<FaceAnchor | null>(null)
@@ -303,7 +319,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         const box = await faceDetection.detectPrimaryFace(video)
 
         if (!isCancelled) {
-          setFaceAnchor(box ? mapFaceBoxToFrame(box, video, frame) : null)
+          setFaceAnchor(
+            box ? mapFaceBoxToFrame(box, video, frame, isMirrored) : null,
+          )
         }
       }
 
@@ -323,7 +341,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         window.clearTimeout(trackingTimerRef.current)
       }
     }
-  }, [videoRef])
+  }, [isMirrored, videoRef])
 
   useEffect(() => {
     let isCancelled = false
@@ -376,7 +394,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       >
         <video
           ref={videoRef}
-          className="camera-feed"
+          className={`camera-feed ${isMirrored ? 'mirrored-feed' : ''}`}
           autoPlay
           muted
           playsInline
@@ -398,6 +416,16 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         <button className="mode-back" type="button" onClick={onLogout}>
           <ArrowLeft size={17} />
           Login
+        </button>
+
+        <button
+          className="camera-flip"
+          type="button"
+          onClick={flipCamera}
+          aria-label="Flip camera"
+        >
+          <RefreshCw size={17} />
+          {facingMode === 'user' ? 'Front' : 'Rear'}
         </button>
 
         {recognized && faceAnchor && (
@@ -471,6 +499,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     videoRef: captureVideoRef,
     cameraStatus,
     isCameraLive,
+    facingMode,
+    flipCamera,
+    isMirrored,
   } = useCamera('user')
   const [people, setPeople] = useState<KnownPersonProfile[]>([])
   const [filter, setFilter] = useState('All')
@@ -633,12 +664,21 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
           <section className="capture-panel" aria-label="Capture face photo">
             <video
               ref={captureVideoRef}
-              className="capture-feed"
+              className={`capture-feed ${isMirrored ? 'mirrored-feed' : ''}`}
               autoPlay
               muted
               playsInline
             />
             {!isCameraLive && <p>{cameraStatus}</p>}
+            <button
+              className="capture-flip"
+              type="button"
+              onClick={flipCamera}
+              aria-label="Flip camera"
+            >
+              <RefreshCw size={16} />
+              {facingMode === 'user' ? 'Front' : 'Rear'}
+            </button>
             <button type="button" onClick={handleCapturePhoto}>
               Click picture
             </button>
