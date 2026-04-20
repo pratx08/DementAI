@@ -175,7 +175,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const trackingTimerRef = useRef<number | null>(null)
   const captionTimerRef = useRef<number | null>(null)
   const [micEnabled, setMicEnabled] = useState(false)
-  const [micStatus, setMicStatus] = useState('Tap the mic for CC')
+  const [micStatus, setMicStatus] = useState('')
   const destination = useMemo(
     () => ({
       label: appConfig.map.destinationLabel,
@@ -198,7 +198,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     interimTranscript,
     finalTranscript || transcript,
   )
-  const captionText = latestCaption || (listening ? 'CC on' : '')
 
   useEffect(() => {
     const orientation = screen.orientation as ScreenOrientation & {
@@ -336,7 +335,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         language: 'en-US',
       })
       setMicEnabled(true)
-      setMicStatus('Listening for CC')
+      setMicStatus('')
     } catch {
       setMicEnabled(false)
       setMicStatus('Allow mic access for CC')
@@ -347,7 +346,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     if (micEnabled) {
       setMicEnabled(false)
       SpeechRecognition.stopListening()
-      setMicStatus('CC paused')
+      setMicStatus('')
       return
     }
 
@@ -487,16 +486,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           Login
         </button>
 
-        <button
-          className={`microphone-toggle ${micEnabled ? 'is-listening' : ''}`}
-          type="button"
-          onClick={handleMicrophoneToggle}
-          aria-pressed={micEnabled}
-          aria-label={micEnabled ? 'Pause microphone' : 'Start microphone'}
-        >
-          {micEnabled ? <Mic size={17} /> : <MicOff size={17} />}
-        </button>
-
         {recognized && faceAnchor && (
           <aside
             className="identity-card tracked-identity-card"
@@ -534,6 +523,15 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         )}
 
         <nav className="action-rail" aria-label="Primary actions">
+          <button
+            className={`microphone-toggle ${micEnabled ? 'is-listening' : ''}`}
+            type="button"
+            onClick={handleMicrophoneToggle}
+            aria-pressed={micEnabled}
+            aria-label={micEnabled ? 'Pause microphone' : 'Start microphone'}
+          >
+            {micEnabled ? <Mic size={22} /> : <MicOff size={22} />}
+          </button>
           <button className="danger-action" type="button" aria-label="SOS">
             <AlertTriangle size={23} />
             <span>SOS</span>
@@ -553,13 +551,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           </button>
         </nav>
 
-        {browserSupportsSpeechRecognition && captionText && (
+        {browserSupportsSpeechRecognition && latestCaption && (
           <section className="captions" aria-live="polite">
-            <p>{captionText}</p>
+            <p>{latestCaption}</p>
           </section>
         )}
 
-        {!captionText && micStatus && (
+        {!latestCaption && micStatus && (
           <section className="microphone-status" aria-live="polite">
             <p>{micStatus}</p>
           </section>

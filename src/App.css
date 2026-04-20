@@ -164,16 +164,6 @@ button {
 }
 
 .microphone-toggle {
-  position: absolute;
-  top: 62px;
-  right: 18px;
-  z-index: 7;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  min-height: 38px;
-  padding: 0;
   color: rgba(248, 255, 250, 0.9);
 }
 
@@ -904,13 +894,8 @@ button {
 
   .mode-back {
     top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .microphone-toggle {
-    top: 12px;
-    right: 98px;
+    left: 12px;
+    transform: none;
   }
 
   .corner-guide {
@@ -969,7 +954,7 @@ button {
 
   .action-rail {
     top: 50%;
-    right: 10px;
+    right: 12px;
     bottom: auto;
     left: auto;
     grid-template-columns: 1fr;
@@ -1065,7 +1050,7 @@ button {
 @media (max-width: 720px) and (orientation: landscape) {
   .action-rail {
     top: 50%;
-    right: 10px;
+    right: 12px;
     bottom: auto;
     left: auto;
     grid-template-columns: 1fr;
