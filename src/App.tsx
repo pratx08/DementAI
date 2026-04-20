@@ -159,8 +159,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     videoRef,
     cameraStatus,
     isCameraLive,
-    facingMode,
-    flipCamera,
     isMirrored,
   } = useCamera()
   const [recognized, setRecognized] = useState<KnownPersonProfile | null>(null)
@@ -176,8 +174,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const recognitionTimerRef = useRef<number | null>(null)
   const trackingTimerRef = useRef<number | null>(null)
   const captionTimerRef = useRef<number | null>(null)
-  const microphoneStreamRef = useRef<MediaStream | null>(null)
-  const [micStatus, setMicStatus] = useState('Tap Mic to start captions')
+  const [micEnabled, setMicEnabled] = useState(false)
+  const [micStatus, setMicStatus] = useState('Tap the mic for CC')
   const destination = useMemo(
     () => ({
       label: appConfig.map.destinationLabel,
@@ -189,13 +187,17 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   )
 
   const {
+    transcript,
     interimTranscript,
     finalTranscript,
     browserSupportsSpeechRecognition,
     listening,
     resetTranscript,
   } = useSpeechRecognition()
-  const latestCaption = getLiveCaption(interimTranscript, finalTranscript)
+  const latestCaption = getLiveCaption(
+    interimTranscript,
+    finalTranscript || transcript,
+  )
   const captionText = latestCaption || (listening ? 'CC on' : '')
 
   useEffect(() => {
@@ -253,7 +255,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     captionTimerRef.current = window.setTimeout(() => {
       resetTranscript()
-    }, 2000)
+    }, 5000)
 
     return () => {
       if (captionTimerRef.current) {
@@ -314,37 +316,65 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   useEffect(
     () => () => {
       SpeechRecognition.stopListening()
-      microphoneStreamRef.current?.getTracks().forEach((track) => track.stop())
     },
     [],
   )
 
-  async function handleMicrophoneToggle() {
-    if (listening) {
-      SpeechRecognition.stopListening()
-      setMicStatus('Mic paused')
-      return
-    }
-
+  async function startCaptions() {
     if (!browserSupportsSpeechRecognition) {
-      setMicStatus('Speech captions are not supported in this browser')
+      setMicEnabled(false)
+      setMicStatus('CC unavailable in this browser')
       return
     }
 
     try {
-      microphoneStreamRef.current ??= await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((track) => track.stop())
 
       await SpeechRecognition.startListening({
-        continuous: true,
+        continuous: false,
         language: 'en-US',
       })
-      setMicStatus('Listening')
+      setMicEnabled(true)
+      setMicStatus('Listening for CC')
     } catch {
-      setMicStatus('Allow microphone access to use captions')
+      setMicEnabled(false)
+      setMicStatus('Allow mic access for CC')
     }
   }
+
+  async function handleMicrophoneToggle() {
+    if (micEnabled) {
+      setMicEnabled(false)
+      SpeechRecognition.stopListening()
+      setMicStatus('CC paused')
+      return
+    }
+
+    await startCaptions()
+  }
+
+  useEffect(() => {
+    if (!micEnabled || listening || !browserSupportsSpeechRecognition) {
+      return
+    }
+
+    const restartTimer = window.setTimeout(() => {
+      if (document.visibilityState !== 'visible') {
+        return
+      }
+
+      SpeechRecognition.startListening({
+        continuous: false,
+        language: 'en-US',
+      }).catch(() => {
+        setMicEnabled(false)
+        setMicStatus('Tap mic to restart CC')
+      })
+    }, 350)
+
+    return () => window.clearTimeout(restartTimer)
+  }, [browserSupportsSpeechRecognition, listening, micEnabled])
 
   useEffect(() => {
     let isCancelled = false
@@ -458,22 +488,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         </button>
 
         <button
-          className="camera-flip"
-          type="button"
-          onClick={flipCamera}
-          aria-label="Flip camera"
-        >
-          {facingMode === 'user' ? 'Front' : 'Rear'}
-        </button>
-
-        <button
-          className={`microphone-toggle ${listening ? 'is-listening' : ''}`}
+          className={`microphone-toggle ${micEnabled ? 'is-listening' : ''}`}
           type="button"
           onClick={handleMicrophoneToggle}
-          aria-pressed={listening}
-          aria-label={listening ? 'Pause microphone' : 'Start microphone'}
+          aria-pressed={micEnabled}
+          aria-label={micEnabled ? 'Pause microphone' : 'Start microphone'}
         >
-          {listening ? <Mic size={17} /> : <MicOff size={17} />}
+          {micEnabled ? <Mic size={17} /> : <MicOff size={17} />}
         </button>
 
         {recognized && faceAnchor && (
