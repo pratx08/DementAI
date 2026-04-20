@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import SpeechRecognition, {
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core'
+import { SpeechRecognition as NativeSpeechRecognition } from '@capgo/capacitor-speech-recognition'
+import WebSpeechRecognition, {
   useSpeechRecognition,
 } from 'react-speech-recognition'
 import {
@@ -36,14 +38,6 @@ type FaceAnchor = {
 }
 
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
-
-function getLiveCaption(interimTranscript: string, finalTranscript: string) {
-  const liveSpeech = interimTranscript || finalTranscript
-  const words = liveSpeech.trim().split(/\s+/).filter(Boolean)
-
-  return words.slice(-10).join(' ')
-}
-
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -51,6 +45,13 @@ function fileToDataUrl(file: File) {
     reader.onerror = () => reject(new Error('Image preview could not be read.'))
     reader.readAsDataURL(file)
   })
+}
+
+function getLiveCaption(interimTranscript: string, finalTranscript: string) {
+  const liveSpeech = interimTranscript || finalTranscript
+  const words = liveSpeech.trim().split(/\s+/).filter(Boolean)
+
+  return words.slice(-10).join(' ')
 }
 
 async function captureVideoFile(video: HTMLVideoElement, prefix: string) {
@@ -174,6 +175,10 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const recognitionTimerRef = useRef<number | null>(null)
   const trackingTimerRef = useRef<number | null>(null)
   const captionTimerRef = useRef<number | null>(null)
+  const captionEnabledRef = useRef(false)
+  const nativePartialResultsRef = useRef<PluginListenerHandle | null>(null)
+  const nativeListeningStateRef = useRef<PluginListenerHandle | null>(null)
+  const [captionText, setCaptionText] = useState('')
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
   const destination = useMemo(
@@ -185,19 +190,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }),
     [],
   )
-
-  const {
-    transcript,
-    interimTranscript,
-    finalTranscript,
-    browserSupportsSpeechRecognition,
-    listening,
-    resetTranscript,
-  } = useSpeechRecognition()
-  const latestCaption = getLiveCaption(
-    interimTranscript,
-    finalTranscript || transcript,
+  const isNativeApp = Capacitor.isNativePlatform()
+  const webSpeech = useSpeechRecognition()
+  const webCaption = getLiveCaption(
+    webSpeech.interimTranscript,
+    webSpeech.finalTranscript || webSpeech.transcript,
   )
+  const resetWebTranscript = webSpeech.resetTranscript
 
   useEffect(() => {
     const orientation = screen.orientation as ScreenOrientation & {
@@ -244,7 +243,15 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   }, [showMap])
 
   useEffect(() => {
-    if (!latestCaption) {
+    if (!webCaption || isNativeApp) {
+      return
+    }
+
+    setCaptionText(webCaption)
+  }, [isNativeApp, webCaption])
+
+  useEffect(() => {
+    if (!captionText) {
       return
     }
 
@@ -253,7 +260,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
 
     captionTimerRef.current = window.setTimeout(() => {
-      resetTranscript()
+      setCaptionText('')
+      resetWebTranscript()
     }, 5000)
 
     return () => {
@@ -261,7 +269,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         window.clearTimeout(captionTimerRef.current)
       }
     }
-  }, [latestCaption, resetTranscript])
+  }, [captionText, resetWebTranscript])
 
   useEffect(() => {
     let isMounted = true
@@ -314,39 +322,143 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
   useEffect(
     () => () => {
-      SpeechRecognition.stopListening()
+      captionEnabledRef.current = false
+      WebSpeechRecognition.stopListening()
+      NativeSpeechRecognition.stop().catch(() => undefined)
+      NativeSpeechRecognition.removeAllListeners().catch(() => undefined)
     },
     [],
   )
 
-  async function startCaptions() {
-    if (!browserSupportsSpeechRecognition) {
+  async function startNativeCaptions() {
+    const availability = await NativeSpeechRecognition.available()
+
+    if (!availability.available) {
       setMicEnabled(false)
-      setMicStatus('CC unavailable in this browser')
-      return
+      setMicStatus('CC unavailable on this phone')
+      return false
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach((track) => track.stop())
+    const permissions = await NativeSpeechRecognition.requestPermissions()
 
-      await SpeechRecognition.startListening({
-        continuous: false,
-        language: 'en-US',
-      })
+    if (permissions.speechRecognition !== 'granted') {
+      setMicEnabled(false)
+      setMicStatus('Allow mic and speech access for CC')
+      return false
+    }
+
+    const onDeviceRecognition = await NativeSpeechRecognition.isOnDeviceRecognitionAvailable({
+      language: 'en-US',
+    }).catch(() => ({ available: false }))
+    const nativeCaptionOptions = {
+      language: 'en-US',
+      maxResults: 3,
+      partialResults: true,
+      popup: false,
+      addPunctuation: true,
+      useOnDeviceRecognition: onDeviceRecognition.available,
+    }
+
+    await NativeSpeechRecognition.removeAllListeners()
+
+    nativePartialResultsRef.current = await NativeSpeechRecognition.addListener(
+      'partialResults',
+      (data) => {
+        const text = data.matches?.[0]?.trim()
+
+        if (text) {
+          setCaptionText(text)
+        }
+      },
+    )
+
+    nativeListeningStateRef.current = await NativeSpeechRecognition.addListener(
+      'listeningState',
+      (data) => {
+        const stopped = data.status === 'stopped' || data.state === 'stopped'
+
+        if (!stopped || !captionEnabledRef.current) {
+          return
+        }
+
+        window.setTimeout(() => {
+          if (!captionEnabledRef.current) {
+            return
+          }
+
+          NativeSpeechRecognition.start(nativeCaptionOptions).catch(() => {
+            setMicEnabled(false)
+            setMicStatus('Tap mic to restart CC')
+          })
+        }, 350)
+      },
+    )
+
+    await NativeSpeechRecognition.start(nativeCaptionOptions)
+
+    return true
+  }
+
+  async function startWebCaptions() {
+    if (!webSpeech.browserSupportsSpeechRecognition) {
+      setMicEnabled(false)
+      setMicStatus('CC unavailable in this browser')
+      return false
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    stream.getTracks().forEach((track) => track.stop())
+
+    await WebSpeechRecognition.startListening({
+      continuous: false,
+      language: 'en-US',
+    })
+
+    return true
+  }
+
+  async function startCaptions() {
+    try {
+      captionEnabledRef.current = true
+      setCaptionText('')
+
+      const didStart = isNativeApp
+        ? await startNativeCaptions()
+        : await startWebCaptions()
+
+      if (!didStart) {
+        captionEnabledRef.current = false
+        return
+      }
+
       setMicEnabled(true)
       setMicStatus('')
     } catch {
+      captionEnabledRef.current = false
       setMicEnabled(false)
       setMicStatus('Allow mic access for CC')
     }
   }
 
+  async function stopCaptions() {
+    captionEnabledRef.current = false
+    setMicEnabled(false)
+    setMicStatus('')
+
+    if (isNativeApp) {
+      await NativeSpeechRecognition.stop().catch(() => undefined)
+      await NativeSpeechRecognition.removeAllListeners().catch(() => undefined)
+      nativePartialResultsRef.current = null
+      nativeListeningStateRef.current = null
+      return
+    }
+
+    WebSpeechRecognition.stopListening()
+  }
+
   async function handleMicrophoneToggle() {
     if (micEnabled) {
-      setMicEnabled(false)
-      SpeechRecognition.stopListening()
-      setMicStatus('')
+      await stopCaptions()
       return
     }
 
@@ -354,7 +466,12 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   }
 
   useEffect(() => {
-    if (!micEnabled || listening || !browserSupportsSpeechRecognition) {
+    if (
+      isNativeApp ||
+      !micEnabled ||
+      webSpeech.listening ||
+      !webSpeech.browserSupportsSpeechRecognition
+    ) {
       return
     }
 
@@ -363,7 +480,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         return
       }
 
-      SpeechRecognition.startListening({
+      WebSpeechRecognition.startListening({
         continuous: false,
         language: 'en-US',
       }).catch(() => {
@@ -373,7 +490,12 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }, 350)
 
     return () => window.clearTimeout(restartTimer)
-  }, [browserSupportsSpeechRecognition, listening, micEnabled])
+  }, [
+    isNativeApp,
+    micEnabled,
+    webSpeech.browserSupportsSpeechRecognition,
+    webSpeech.listening,
+  ])
 
   useEffect(() => {
     let isCancelled = false
@@ -551,13 +673,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           </button>
         </nav>
 
-        {browserSupportsSpeechRecognition && latestCaption && (
+        {captionText && (
           <section className="captions" aria-live="polite">
-            <p>{latestCaption}</p>
+            <p>{captionText}</p>
           </section>
         )}
 
-        {!latestCaption && micStatus && (
+        {!captionText && micStatus && (
           <section className="microphone-status" aria-live="polite">
             <p>{micStatus}</p>
           </section>
