@@ -11,6 +11,7 @@ export const appConfig = {
     humanModelPath: assetPath('human-models'),
     knownFacesPath: assetPath('data/knownFaces.json'),
     peopleStorageKey: 'dementai-known-people',
+    dashboardStorageKey: 'dementai-dashboard-state',
     minRecognitionIntervalMs: 2200,
     minTrackingIntervalMs: 120,
     matchSimilarityThreshold: 0.5,

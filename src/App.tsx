@@ -26,6 +26,17 @@ import {
   saveKnownPeople,
   type KnownPersonProfile,
 } from './services/faceRecognition'
+import {
+  loadDashboardState,
+  saveDashboardState,
+  type CognitiveObservation,
+  type DashboardState,
+  type DailyLogEntry,
+  type ReminderItem,
+  type SosAlert,
+  type UnknownQueueItem,
+} from './services/dashboardData'
+import { summarizeConversation } from './services/summary'
 import type { CSSProperties, FormEvent } from 'react'
 import type { FaceBox } from './services/mediaPipeFaceDetection'
 
@@ -65,7 +76,19 @@ type FaceAnchor = {
   top: number
 }
 
+type CaretakerTab =
+  | 'overview'
+  | 'contacts'
+  | 'daily-log'
+  | 'unknown-queue'
+  | 'visitor-schedule'
+  | 'reminders'
+  | 'cognitive-report'
+  | 'safe-zone'
+  | 'sos-alerts'
+
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
+const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -151,6 +174,67 @@ function mapFaceBoxToFrame(
     left,
     top: Math.min(Math.max(boxTop + boxHeight * 0.16, 14), frameHeight - 120),
   }
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value))
+}
+
+function getRelativeTime(value?: string) {
+  if (!value) {
+    return 'No recent visits'
+  }
+
+  const diff = Date.now() - new Date(value).getTime()
+  const days = Math.max(0, Math.floor(diff / (24 * 60 * 60 * 1000)))
+
+  if (days === 0) {
+    return 'Today'
+  }
+
+  if (days === 1) {
+    return '1 day ago'
+  }
+
+  return `${days} days ago`
+}
+
+function createLocalId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function inferSentiment(transcript: string): DailyLogEntry['sentiment'] {
+  const normalized = transcript.toLowerCase()
+
+  if (
+    normalized.includes('forgot') ||
+    normalized.includes('confused') ||
+    normalized.includes('not sure')
+  ) {
+    return 'Confused'
+  }
+
+  if (
+    normalized.includes('great') ||
+    normalized.includes('happy') ||
+    normalized.includes('good')
+  ) {
+    return 'Positive'
+  }
+
+  return 'Neutral'
 }
 
 function App() {
@@ -788,37 +872,94 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 }
 
 function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
-  const {
-    videoRef: captureVideoRef,
-    cameraStatus,
-    isCameraLive,
-    facingMode,
-    flipCamera,
-    isMirrored,
-  } = useCamera('user')
+  const { videoRef: captureVideoRef, cameraStatus, isCameraLive, isMirrored } =
+    useCamera('user')
   const [people, setPeople] = useState<KnownPersonProfile[]>([])
+  const [dashboard, setDashboard] = useState<DashboardState | null>(null)
+  const [status, setStatus] = useState('Ready to manage MemoryBridge care workflows.')
+  const [activeTab, setActiveTab] = useState<CaretakerTab>('overview')
+  const [mobileTabsOpen, setMobileTabsOpen] = useState(false)
   const [filter, setFilter] = useState('All')
-  const [status, setStatus] = useState('Ready to add a person.')
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [name, setName] = useState('')
   const [relation, setRelation] = useState('')
   const [group, setGroup] = useState(groupOptions[0])
+  const [phone, setPhone] = useState('')
+  const [notes, setNotes] = useState('')
+  const [expectedVisitDays, setExpectedVisitDays] = useState<string[]>([])
   const [summary, setSummary] = useState('')
+  const [selectedContactId, setSelectedContactId] = useState('')
+  const [transcriptDraft, setTranscriptDraft] = useState('')
+  const [summaryDraft, setSummaryDraft] = useState('')
+  const [isSummarizing, setIsSummarizing] = useState(false)
+  const [logFilter, setLogFilter] = useState<'all' | DailyLogEntry['type']>('all')
+  const [manualLogTitle, setManualLogTitle] = useState('')
+  const [manualLogSummary, setManualLogSummary] = useState('')
+  const [selectedReminderCategory, setSelectedReminderCategory] =
+    useState<ReminderItem['category']>('Medication')
+  const [reminderTitle, setReminderTitle] = useState('')
+  const [reminderMessage, setReminderMessage] = useState('')
+  const [reminderSchedule, setReminderSchedule] = useState('')
+  const [reminderPriority, setReminderPriority] =
+    useState<ReminderItem['priority']>('Medium')
+  const [visitorPersonId, setVisitorPersonId] = useState('')
+  const [visitorDate, setVisitorDate] = useState('')
+  const [visitorContext, setVisitorContext] = useState('')
+  const [trustedLocationDraft, setTrustedLocationDraft] = useState('')
+  const [sosNoteDraft, setSosNoteDraft] = useState('')
+  const [noteListening, setNoteListening] = useState(false)
+  const noteRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const didLoadRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    async function loadPeople() {
+    async function loadPeopleAndDashboard() {
       try {
         await loadFaceModels()
-        setPeople(await loadKnownPeople())
+        const loadedPeople = await loadKnownPeople()
+        setPeople(loadedPeople)
+        setDashboard(loadDashboardState(loadedPeople))
+        setSelectedContactId(loadedPeople[0]?.id ?? '')
+        setVisitorPersonId(loadedPeople[0]?.id ?? '')
+        didLoadRef.current = true
       } catch {
         setStatus('Local face recognition models could not be loaded.')
       }
     }
 
-    loadPeople()
+    loadPeopleAndDashboard()
   }, [])
+
+  useEffect(() => {
+    if (!didLoadRef.current) {
+      return
+    }
+
+    saveKnownPeople(people)
+  }, [people])
+
+  useEffect(() => {
+    if (!didLoadRef.current || !dashboard) {
+      return
+    }
+
+    saveDashboardState(dashboard)
+  }, [dashboard])
+
+  useEffect(
+    () => () => {
+      noteRecognitionRef.current?.stop()
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!selectedContactId && people.length > 0) {
+      setSelectedContactId(people[0].id)
+      setVisitorPersonId((current) => current || people[0].id)
+    }
+  }, [people, selectedContactId])
 
   const visiblePeople = useMemo(() => {
     if (filter === 'All') {
@@ -832,6 +973,112 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     () => ['All', ...Array.from(new Set(people.map((person) => person.group)))],
     [people],
   )
+
+  const selectedContact = useMemo(
+    () => people.find((person) => person.id === selectedContactId) ?? null,
+    [people, selectedContactId],
+  )
+
+  useEffect(() => {
+    if (!selectedContact) {
+      setTranscriptDraft('')
+      setSummaryDraft('')
+      return
+    }
+
+    setTranscriptDraft(selectedContact.lastTranscript ?? '')
+    setSummaryDraft(selectedContact.lastConversationSummary)
+  }, [selectedContact])
+
+  const filteredDailyLog = useMemo(() => {
+    if (!dashboard) {
+      return []
+    }
+
+    if (logFilter === 'all') {
+      return dashboard.dailyLog
+    }
+
+    return dashboard.dailyLog.filter((entry) => entry.type === logFilter)
+  }, [dashboard, logFilter])
+
+  const overviewStats = useMemo(() => {
+    if (!dashboard) {
+      return {
+        peopleMetToday: 0,
+        pendingUnknowns: 0,
+        sosThisWeek: 0,
+        currentCognitiveScore: 84,
+      }
+    }
+
+    const today = new Date().toDateString()
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const peopleMetToday = dashboard.dailyLog.filter(
+      (entry) =>
+        entry.type === 'encounter' &&
+        new Date(entry.occurredAt).toDateString() === today,
+    ).length
+    const pendingUnknowns = dashboard.unknownQueue.filter(
+      (item) => item.status !== 'dismissed',
+    ).length
+    const sosThisWeek = dashboard.sosAlerts.filter(
+      (alert) => new Date(alert.time).getTime() >= weekAgo,
+    ).length
+    const confusionCount = dashboard.dailyLog.filter(
+      (entry) => entry.sentiment === 'Confused',
+    ).length
+    const positiveCount = dashboard.dailyLog.filter(
+      (entry) => entry.sentiment === 'Positive',
+    ).length
+
+    return {
+      peopleMetToday,
+      pendingUnknowns,
+      sosThisWeek,
+      currentCognitiveScore: Math.max(58, 82 + positiveCount * 2 - confusionCount * 5),
+    }
+  }, [dashboard])
+
+  const weeklyDimensions = useMemo(() => {
+    const encounterCount =
+      dashboard?.dailyLog.filter((entry) => entry.type === 'encounter').length ?? 0
+    const confusedCount =
+      dashboard?.dailyLog.filter((entry) => entry.sentiment === 'Confused').length ?? 0
+
+    return [
+      { label: 'Vocabulary', score: Math.max(50, 78 - confusedCount * 4) },
+      { label: 'Repetition', score: Math.max(42, 74 - confusedCount * 6) },
+      { label: 'Coherence', score: Math.max(46, 80 - confusedCount * 5) },
+      { label: 'Recall', score: Math.max(48, 76 + Math.min(encounterCount, 4)) },
+      { label: 'Fluency', score: Math.max(52, 79 - confusedCount * 3) },
+    ]
+  }, [dashboard])
+
+  function updateDashboard(updater: (current: DashboardState) => DashboardState) {
+    setDashboard((current) => (current ? updater(current) : current))
+  }
+
+  function updatePerson(
+    personId: string,
+    updater: (person: KnownPersonProfile) => KnownPersonProfile,
+  ) {
+    setPeople((current) =>
+      current.map((person) => (person.id === personId ? updater(person) : person)),
+    )
+  }
+
+  function resetContactForm() {
+    setImageFiles([])
+    setImagePreviews([])
+    setName('')
+    setRelation('')
+    setGroup(groupOptions[0])
+    setPhone('')
+    setNotes('')
+    setExpectedVisitDays([])
+    setSummary('')
+  }
 
   async function handleImageChange(file: File | null) {
     if (!file) {
@@ -871,6 +1118,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
       clearKnownPeople()
       setPeople([])
       setFilter('All')
+      setSelectedContactId('')
       setStatus('All previously added faces were cleared.')
     } catch {
       setStatus('Could not clear stored faces.')
@@ -910,22 +1158,36 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         name: name.trim(),
         relation: relation.trim(),
         group,
+        phone: phone.trim(),
+        notes: notes.trim(),
+        expectedVisitDays,
         lastConversationSummary:
           summary.trim() ||
           'No conversation summary yet. Add one after the next visit.',
         imageDataUrl: imagePreviews[0],
+        lastVisitAt: new Date().toISOString(),
+        visitsThisMonth: 0,
         descriptors,
       }
       const nextPeople = [profile, ...people.filter((person) => person.id !== profile.id)]
 
-      saveKnownPeople(nextPeople)
       setPeople(nextPeople)
-      setImageFiles([])
-      setImagePreviews([])
-      setName('')
-      setRelation('')
-      setGroup(groupOptions[0])
-      setSummary('')
+      setSelectedContactId(profile.id)
+      setVisitorPersonId(profile.id)
+      updateDashboard((current) => ({
+        ...current,
+        dailyLog: [
+          {
+            id: createLocalId('log'),
+            type: 'note',
+            title: `Contact added: ${profile.name}`,
+            occurredAt: new Date().toISOString(),
+            summary: `Added ${profile.name} to the recognition database as ${profile.relation}.`,
+          },
+          ...current.dailyLog,
+        ],
+      }))
+      resetContactForm()
       setStatus(`${profile.name} is ready for patient camera recognition.`)
     } catch (error) {
       setStatus(
@@ -938,177 +1200,1099 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  async function handleStartContactTranscript() {
+    if (!selectedContact) {
+      setStatus('Select a contact before recording visit notes.')
+      return
+    }
+
+    const BrowserSpeechRecognition = getBrowserSpeechRecognition()
+
+    if (!BrowserSpeechRecognition) {
+      setStatus('Speech-to-text is unavailable in this browser.')
+      return
+    }
+
+    try {
+      await requestMicPermission()
+      noteRecognitionRef.current?.stop()
+      const recognition = new BrowserSpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+      recognition.onresult = (event) => {
+        let nextTranscript = ''
+
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          nextTranscript += `${event.results[index][0]?.transcript ?? ''} `
+        }
+
+        setTranscriptDraft((current) => `${current} ${nextTranscript}`.trim())
+      }
+      recognition.onerror = () => {
+        setNoteListening(false)
+        setStatus('Microphone transcription stopped. Tap the button to try again.')
+      }
+      recognition.onend = () => {
+        setNoteListening(false)
+      }
+      noteRecognitionRef.current = recognition
+      recognition.start()
+      setNoteListening(true)
+      setStatus(`Listening for ${selectedContact.name}'s visit notes...`)
+    } catch {
+      setStatus('Allow microphone access to capture visit notes.')
+    }
+  }
+
+  function handleStopContactTranscript() {
+    noteRecognitionRef.current?.stop()
+    setNoteListening(false)
+  }
+
+  async function handleGenerateSummary() {
+    if (!selectedContact || !transcriptDraft.trim()) {
+      setStatus('Add or dictate visit notes before generating a summary.')
+      return
+    }
+
+    setIsSummarizing(true)
+    setStatus('Generating a lightweight local summary for the memory card...')
+
+    try {
+      const nextSummary = await summarizeConversation(transcriptDraft)
+      const sentiment = inferSentiment(transcriptDraft)
+      const summaryText = nextSummary.trim()
+
+      setSummaryDraft(summaryText)
+      updatePerson(selectedContact.id, (person) => ({
+        ...person,
+        lastConversationSummary: summaryText,
+        lastTranscript: transcriptDraft.trim(),
+        lastVisitAt: new Date().toISOString(),
+        visitsThisMonth: (person.visitsThisMonth ?? 0) + 1,
+      }))
+      updateDashboard((current) => ({
+        ...current,
+        dailyLog: [
+          {
+            id: createLocalId('log'),
+            type: 'encounter',
+            title: selectedContact.name,
+            personId: selectedContact.id,
+            relationship: selectedContact.relation,
+            occurredAt: new Date().toISOString(),
+            durationMinutes: Math.max(5, Math.round(transcriptDraft.split(/\s+/).length / 18)),
+            sentiment,
+            summary: summaryText,
+            transcript: transcriptDraft.trim(),
+            location: 'Patient home',
+          },
+          ...current.dailyLog,
+        ],
+        cognitiveObservations:
+          sentiment === 'Confused'
+            ? [
+                {
+                  id: createLocalId('obs'),
+                  date: new Date().toISOString(),
+                  title: `Confusion cue during conversation with ${selectedContact.name}`,
+                  source: 'AI',
+                  severity: 'Medium',
+                  actionTaken: 'Review transcript and compare with next visit.',
+                },
+                ...current.cognitiveObservations,
+              ]
+            : current.cognitiveObservations,
+      }))
+      setStatus(`Saved a new card summary for ${selectedContact.name}.`)
+    } finally {
+      setIsSummarizing(false)
+    }
+  }
+
+  function handleSaveManualSummary() {
+    if (!selectedContact || !summaryDraft.trim()) {
+      setStatus('Select a contact and add a summary first.')
+      return
+    }
+
+    updatePerson(selectedContact.id, (person) => ({
+      ...person,
+      lastConversationSummary: summaryDraft.trim(),
+    }))
+    setStatus(`Updated the memory card for ${selectedContact.name}.`)
+  }
+
+  function handleAddManualLog(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!manualLogTitle.trim() || !manualLogSummary.trim()) {
+      setStatus('Add both a title and note to save the daily log entry.')
+      return
+    }
+
+    updateDashboard((current) => ({
+      ...current,
+      dailyLog: [
+        {
+          id: createLocalId('log'),
+          type: 'note',
+          title: manualLogTitle.trim(),
+          occurredAt: new Date().toISOString(),
+          summary: manualLogSummary.trim(),
+        },
+        ...current.dailyLog,
+      ],
+    }))
+    setManualLogTitle('')
+    setManualLogSummary('')
+    setStatus('Daily note saved.')
+  }
+
+  function handleQueueToContact(item: UnknownQueueItem) {
+    setName(item.heardName === 'No clear name' ? '' : item.heardName)
+    setRelation('Visitor')
+    setSummary(item.snippet)
+    setNotes(`Emotional state during flag: ${item.emotionalState}.`)
+    setActiveTab('contacts')
+    setMobileTabsOpen(false)
+    setStatus('Unknown visitor details moved into the contact form for review.')
+  }
+
+  function handleScheduleVisitor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!visitorPersonId || !visitorDate || !visitorContext.trim()) {
+      setStatus('Choose a contact, date, and briefing context for the visit.')
+      return
+    }
+
+    updateDashboard((current) => ({
+      ...current,
+      visitorSchedule: [
+        {
+          id: createLocalId('visit'),
+          personId: visitorPersonId,
+          visitDate: new Date(visitorDate).toISOString(),
+          status: 'Scheduled',
+          context: visitorContext.trim(),
+        },
+        ...current.visitorSchedule,
+      ],
+      dailyLog: [
+        {
+          id: createLocalId('log'),
+          type: 'note',
+          title: 'Briefing scheduled',
+          occurredAt: new Date().toISOString(),
+          summary: visitorContext.trim(),
+        },
+        ...current.dailyLog,
+      ],
+    }))
+    setVisitorDate('')
+    setVisitorContext('')
+    setStatus('Visitor briefing scheduled.')
+  }
+
+  function handleAddReminder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!reminderTitle.trim() || !reminderMessage.trim() || !reminderSchedule.trim()) {
+      setStatus('Fill in the reminder title, schedule, and message first.')
+      return
+    }
+
+    updateDashboard((current) => ({
+      ...current,
+      reminders: [
+        {
+          id: createLocalId('reminder'),
+          title: reminderTitle.trim(),
+          category: selectedReminderCategory,
+          scheduleLabel: reminderSchedule.trim(),
+          message: reminderMessage.trim(),
+          priority: reminderPriority,
+          status: 'On time',
+        },
+        ...current.reminders,
+      ],
+    }))
+    setReminderTitle('')
+    setReminderMessage('')
+    setReminderSchedule('')
+    setReminderPriority('Medium')
+    setStatus('Reminder saved for the patient overlay schedule.')
+  }
+
+  function handleAddTrustedLocation() {
+    if (!trustedLocationDraft.trim()) {
+      return
+    }
+
+    updateDashboard((current) => ({
+      ...current,
+      safeZone: {
+        ...current.safeZone,
+        trustedLocations: [trustedLocationDraft.trim(), ...current.safeZone.trustedLocations],
+      },
+    }))
+    setTrustedLocationDraft('')
+    setStatus('Trusted location added to the safe zone.')
+  }
+
+  function handleSimulateExit() {
+    updateDashboard((current) => ({
+      ...current,
+      safeZone: {
+        ...current.safeZone,
+        exitHistory: [
+          {
+            id: createLocalId('exit'),
+            time: new Date().toISOString(),
+            location: 'New geofence exit event',
+            durationMinutes: 12,
+          },
+          ...current.safeZone.exitHistory,
+        ],
+      },
+    }))
+    setStatus('Added a demo geofence exit event.')
+  }
+
+  function handleResolveAlert(alertId: string) {
+    updateDashboard((current) => ({
+      ...current,
+      sosAlerts: current.sosAlerts.map((alert) =>
+        alert.id === alertId
+          ? { ...alert, status: 'Resolved', note: sosNoteDraft || alert.note }
+          : alert,
+      ),
+    }))
+    setSosNoteDraft('')
+    setStatus('SOS alert marked as resolved.')
+  }
+
+  if (!dashboard) {
+    return (
+      <main className="caretaker-shell">
+        <section className="loading-panel">
+          <strong>Loading caretaker dashboard</strong>
+          <span>Preparing contacts, logs, and MemoryBridge workflows.</span>
+        </section>
+      </main>
+    )
+  }
+
+  const tabs: { id: CaretakerTab; label: string; count?: number }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'contacts', label: 'Contacts', count: people.length },
+    { id: 'daily-log', label: 'Daily Log', count: dashboard.dailyLog.length },
+    { id: 'unknown-queue', label: 'Unknown Queue', count: dashboard.unknownQueue.length },
+    { id: 'visitor-schedule', label: 'Visitor Schedule', count: dashboard.visitorSchedule.length },
+    { id: 'reminders', label: 'Reminders', count: dashboard.reminders.length },
+    { id: 'cognitive-report', label: 'Cognitive Report' },
+    { id: 'safe-zone', label: 'Safe Zone' },
+    { id: 'sos-alerts', label: 'SOS Alerts', count: dashboard.sosAlerts.length },
+  ]
+
   return (
     <main className="caretaker-shell">
       <header className="caretaker-header">
         <div>
-          <p>Caretaker</p>
-          <h1>Recognition People</h1>
+          <p>MemoryBridge caretaker dashboard</p>
+          <h1>Clinical support workflows</h1>
         </div>
-        <button type="button" onClick={onLogout}>
-          <ArrowLeft size={17} />
-          Login
-        </button>
+        <div className="header-actions">
+          <button
+            className="tabs-toggle"
+            type="button"
+            onClick={() => setMobileTabsOpen((current) => !current)}
+          >
+            {mobileTabsOpen ? 'Close tabs' : 'Tabs'}
+          </button>
+          <button type="button" onClick={onLogout}>
+            <ArrowLeft size={17} />
+            Login
+          </button>
+        </div>
       </header>
 
-      <section className="caretaker-layout">
-        <form className="enroll-panel" onSubmit={handleSubmit}>
-          <h2>Add Person</h2>
-          <section className="capture-panel" aria-label="Capture face photo">
-            <video
-              ref={captureVideoRef}
-              className={`capture-feed ${isMirrored ? 'mirrored-feed' : ''}`}
-              autoPlay
-              muted
-              playsInline
-            />
-            {!isCameraLive && <p>{cameraStatus}</p>}
+      <section className="caretaker-workspace">
+        <aside className={`tab-sidebar ${mobileTabsOpen ? 'is-open' : ''}`}>
+          {tabs.map((tab) => (
             <button
-              className="capture-flip"
+              key={tab.id}
+              className={`tab-button ${activeTab === tab.id ? 'is-active' : ''}`}
               type="button"
-              onClick={flipCamera}
-              aria-label="Flip camera"
+              onClick={() => {
+                setActiveTab(tab.id)
+                setMobileTabsOpen(false)
+              }}
             >
-              {facingMode === 'user' ? 'Front' : 'Rear'}
+              <span>{tab.label}</span>
+              {typeof tab.count === 'number' && <small>{tab.count}</small>}
             </button>
-            <button type="button" onClick={handleCapturePhoto}>
-              Click picture
-            </button>
-          </section>
-          <label className="image-drop">
-            {imagePreviews.length > 0 ? (
-              <img src={imagePreviews[imagePreviews.length - 1]} alt="" />
-            ) : (
-              <span>
-                <Upload size={24} />
-                Upload or capture face samples
-              </span>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) =>
-                handleImageChange(event.target.files?.[0] ?? null)
-              }
-            />
-          </label>
+          ))}
+        </aside>
 
-          {imagePreviews.length > 0 && (
-            <div className="sample-strip" aria-label="Captured face samples">
-              {imagePreviews.map((preview, index) => (
-                <button
-                  key={`${preview}-${index}`}
-                  type="button"
-                  onClick={() => handleRemoveSample(index)}
-                  aria-label={`Remove sample ${index + 1}`}
-                >
-                  <img src={preview} alt="" />
-                </button>
-              ))}
+        <section className="tab-panel">
+          {activeTab === 'overview' && (
+            <div className="dashboard-stack">
+              <section className="metric-grid">
+                <article className="metric-card">
+                  <span>People met today</span>
+                  <strong>{overviewStats.peopleMetToday}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Pending unknown flags</span>
+                  <strong>{overviewStats.pendingUnknowns}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>SOS alerts this week</span>
+                  <strong>{overviewStats.sosThisWeek}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Current cognitive score</span>
+                  <strong>{overviewStats.currentCognitiveScore}</strong>
+                </article>
+              </section>
+
+              <section className="dashboard-grid">
+                <article className="panel-card">
+                  <div className="panel-head">
+                    <h2>Today at a glance</h2>
+                    <p>{dashboard.dailyLog.length} recent timeline entries</p>
+                  </div>
+                  <div className="stack-list">
+                    {dashboard.dailyLog.slice(0, 4).map((entry) => (
+                      <div className="list-card" key={entry.id}>
+                        <strong>{entry.title}</strong>
+                        <span>{formatDateTime(entry.occurredAt)}</span>
+                        <p>{entry.summary}</p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="panel-card">
+                  <div className="panel-head">
+                    <h2>Visitors and reminders</h2>
+                    <p>Next scheduled events for the patient</p>
+                  </div>
+                  <div className="stack-list">
+                    {dashboard.visitorSchedule.slice(0, 2).map((visit) => {
+                      const person = people.find((item) => item.id === visit.personId)
+                      return (
+                        <div className="list-card" key={visit.id}>
+                          <strong>{person?.name ?? 'Visitor'}</strong>
+                          <span>{formatDateTime(visit.visitDate)}</span>
+                          <p>{visit.context}</p>
+                        </div>
+                      )
+                    })}
+                    {dashboard.reminders.slice(0, 2).map((reminder) => (
+                      <div className="list-card" key={reminder.id}>
+                        <strong>{reminder.title}</strong>
+                        <span>{reminder.scheduleLabel}</span>
+                        <p>{reminder.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </section>
             </div>
           )}
 
-          <div className="form-grid">
-            <label>
-              Name
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Jane Smith"
-              />
-            </label>
-            <label>
-              Relation to patient
-              <input
-                value={relation}
-                onChange={(event) => setRelation(event.target.value)}
-                placeholder="Daughter"
-              />
-            </label>
-            <label>
-              Group
-              <select
-                value={group}
-                onChange={(event) => setGroup(event.target.value)}
-              >
-                {groupOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          {activeTab === 'contacts' && (
+            <div className="dashboard-stack">
+              <section className="dashboard-grid contacts-grid">
+                <form className="panel-card form-card" onSubmit={handleSubmit}>
+                  <div className="panel-head">
+                    <h2>Add contact</h2>
+                    <p>Build the recognition database for the patient.</p>
+                  </div>
+                  <section className="capture-panel" aria-label="Capture face photo">
+                    <video
+                      ref={captureVideoRef}
+                      className={`capture-feed ${isMirrored ? 'mirrored-feed' : ''}`}
+                      autoPlay
+                      muted
+                      playsInline
+                    />
+                    {!isCameraLive && <p>{cameraStatus}</p>}
+                    <button type="button" onClick={handleCapturePhoto}>
+                      Click picture
+                    </button>
+                  </section>
 
-          <label>
-            Card conversation summary
-            <textarea
-              value={summary}
-              onChange={(event) => setSummary(event.target.value)}
-              placeholder="Recently talked about dinner plans, medication reminders, or family updates."
-            />
-          </label>
+                  <label className="image-drop">
+                    {imagePreviews.length > 0 ? (
+                      <img src={imagePreviews[imagePreviews.length - 1]} alt="" />
+                    ) : (
+                      <span>
+                        <Upload size={24} />
+                        Upload or capture face samples
+                      </span>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleImageChange(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
 
-          <button className="save-person" type="submit" disabled={isSaving}>
-            {isSaving ? 'Adding face...' : 'Add for recognition'}
-          </button>
-          <p className="form-status">{status}</p>
-        </form>
+                  {imagePreviews.length > 0 && (
+                    <div className="sample-strip" aria-label="Captured face samples">
+                      {imagePreviews.map((preview, index) => (
+                        <button
+                          key={`${preview}-${index}`}
+                          type="button"
+                          onClick={() => handleRemoveSample(index)}
+                          aria-label={`Remove sample ${index + 1}`}
+                        >
+                          <img src={preview} alt="" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-        <section className="people-panel">
-          <div className="people-panel-head">
-            <div>
-              <h2>Added People</h2>
-              <p>{people.filter((person) => person.descriptors.length > 0).length} enrolled</p>
-            </div>
-            <div className="people-actions">
-              <button
-                className="clear-faces"
-                type="button"
-                onClick={handleClearPeople}
-              >
-                Clear added faces
-              </button>
-              <div className="filter-row" aria-label="Filter people">
-                {activeGroups.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={filter === option}
-                    onClick={() => setFilter(option)}
-                  >
-                    {option}
+                  <div className="form-grid">
+                    <label>
+                      Name
+                      <input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Sarah Smith"
+                      />
+                    </label>
+                    <label>
+                      Relation
+                      <input
+                        value={relation}
+                        onChange={(event) => setRelation(event.target.value)}
+                        placeholder="Daughter"
+                      />
+                    </label>
+                    <label>
+                      Group
+                      <select value={group} onChange={(event) => setGroup(event.target.value)}>
+                        {groupOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Phone
+                      <input
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        placeholder="555-0199"
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    Expected visit days
+                    <div className="day-selector">
+                      {weekDays.map((day) => (
+                        <button
+                          key={day}
+                          className={expectedVisitDays.includes(day) ? 'is-active' : ''}
+                          type="button"
+                          onClick={() =>
+                            setExpectedVisitDays((current) =>
+                              current.includes(day)
+                                ? current.filter((item) => item !== day)
+                                : [...current, day],
+                            )
+                          }
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+
+                  <label>
+                    Personal notes
+                    <textarea
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                      placeholder="Favorite topics, medication context, or family updates."
+                    />
+                  </label>
+
+                  <label>
+                    Card conversation summary
+                    <textarea
+                      value={summary}
+                      onChange={(event) => setSummary(event.target.value)}
+                      placeholder="Last discussed dinner plans, family updates, and tomorrow's doctor visit."
+                    />
+                  </label>
+
+                  <button className="save-person" type="submit" disabled={isSaving}>
+                    {isSaving ? 'Adding contact...' : 'Add for recognition'}
                   </button>
+                </form>
+
+                <article className="panel-card">
+                  <div className="panel-head">
+                    <h2>Contacts</h2>
+                    <p>{people.length} people in the recognition database</p>
+                  </div>
+                  <div className="toolbar-row">
+                    <div className="filter-row" aria-label="Filter people">
+                      {activeGroups.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={filter === option}
+                          onClick={() => setFilter(option)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                    <button className="clear-faces" type="button" onClick={handleClearPeople}>
+                      Clear added faces
+                    </button>
+                  </div>
+
+                  <div className="contact-list">
+                    {visiblePeople.map((person) => (
+                      <button
+                        key={person.id}
+                        className={`person-row ${selectedContactId === person.id ? 'is-selected' : ''}`}
+                        type="button"
+                        onClick={() => setSelectedContactId(person.id)}
+                      >
+                        {person.imageDataUrl ? (
+                          <img src={person.imageDataUrl} alt="" />
+                        ) : (
+                          <div className="person-initial">{person.name.charAt(0)}</div>
+                        )}
+                        <div>
+                          <strong>{person.name}</strong>
+                          <span>
+                            {person.relation} · {person.group}
+                          </span>
+                          <p>{person.lastConversationSummary}</p>
+                        </div>
+                      </button>
+                    ))}
+                    {visiblePeople.length === 0 && (
+                      <p className="empty-people">No people in this group yet.</p>
+                    )}
+                  </div>
+
+                  {selectedContact && (
+                    <div className="detail-card">
+                      <div className="panel-head">
+                        <h2>{selectedContact.name}</h2>
+                        <p>
+                          Last visit {getRelativeTime(selectedContact.lastVisitAt)} ·{' '}
+                          {selectedContact.visitsThisMonth ?? 0} visits this month
+                        </p>
+                      </div>
+                      <div className="detail-grid">
+                        <div>
+                          <label>Phone</label>
+                          <p>{selectedContact.phone || 'No phone saved yet.'}</p>
+                        </div>
+                        <div>
+                          <label>Expected visits</label>
+                          <p>
+                            {selectedContact.expectedVisitDays?.join(', ') ||
+                              'No routine visit days saved.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="summary-workflow">
+                        <label>
+                          Visit transcript
+                          <textarea
+                            value={transcriptDraft}
+                            onChange={(event) => setTranscriptDraft(event.target.value)}
+                            placeholder="Paste or dictate the latest conversation here."
+                          />
+                        </label>
+                        <div className="inline-actions">
+                          <button
+                            type="button"
+                            onClick={
+                              noteListening
+                                ? handleStopContactTranscript
+                                : handleStartContactTranscript
+                            }
+                          >
+                            {noteListening ? 'Stop note mic' : 'Start note mic'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleGenerateSummary}
+                            disabled={isSummarizing}
+                          >
+                            {isSummarizing ? 'Summarizing...' : 'Generate summary'}
+                          </button>
+                        </div>
+                        <label>
+                          Memory card summary
+                          <textarea
+                            value={summaryDraft}
+                            onChange={(event) => setSummaryDraft(event.target.value)}
+                            placeholder="The latest summary shown on the patient card."
+                          />
+                        </label>
+                        <button type="button" onClick={handleSaveManualSummary}>
+                          Save summary to card
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </article>
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'daily-log' && (
+            <div className="dashboard-grid">
+              <article className="panel-card">
+                <div className="panel-head">
+                  <h2>Daily timeline</h2>
+                  <p>Filter and review the patient's day in chronological order.</p>
+                </div>
+                <div className="filter-row">
+                  {(['all', 'encounter', 'reminder', 'sos', 'note'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={logFilter === option}
+                      onClick={() => setLogFilter(option)}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                <div className="timeline-list">
+                  {filteredDailyLog.map((entry) => (
+                    <div className="timeline-item" key={entry.id}>
+                      <strong>{entry.title}</strong>
+                      <span>{formatDateTime(entry.occurredAt)}</span>
+                      <p>{entry.summary}</p>
+                      {entry.sentiment && <small>Sentiment: {entry.sentiment}</small>}
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <form className="panel-card form-card" onSubmit={handleAddManualLog}>
+                <div className="panel-head">
+                  <h2>Add caretaker note</h2>
+                  <p>Capture manual observations alongside the AI timeline.</p>
+                </div>
+                <label>
+                  Title
+                  <input
+                    value={manualLogTitle}
+                    onChange={(event) => setManualLogTitle(event.target.value)}
+                    placeholder="Evening routine check"
+                  />
+                </label>
+                <label>
+                  Note
+                  <textarea
+                    value={manualLogSummary}
+                    onChange={(event) => setManualLogSummary(event.target.value)}
+                    placeholder="Patient ate dinner well and responded calmly to the medication reminder."
+                  />
+                </label>
+                <button type="submit">Save daily note</button>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'unknown-queue' && (
+            <article className="panel-card">
+              <div className="panel-head">
+                <h2>Unknown queue</h2>
+                <p>Review flagged visitors and decide how to handle them.</p>
+              </div>
+              <div className="stack-list">
+                {dashboard.unknownQueue.map((item) => (
+                  <div className="list-card" key={item.id}>
+                    <strong>{item.heardName}</strong>
+                    <span>
+                      {formatDateTime(item.flaggedAt)} · Emotion: {item.emotionalState}
+                    </span>
+                    <p>{item.snippet}</p>
+                    <div className="inline-actions">
+                      <button type="button" onClick={() => handleQueueToContact(item)}>
+                        Move to contact form
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDashboard((current) => ({
+                            ...current,
+                            unknownQueue: current.unknownQueue.map((entry) =>
+                              entry.id === item.id ? { ...entry, status: 'follow-up' } : entry,
+                            ),
+                          }))
+                        }
+                      >
+                        Flag for follow-up
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDashboard((current) => ({
+                            ...current,
+                            unknownQueue: current.unknownQueue.map((entry) =>
+                              entry.id === item.id ? { ...entry, status: 'dismissed' } : entry,
+                            ),
+                          }))
+                        }
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-          </div>
+            </article>
+          )}
 
-          <div className="people-list">
-            {visiblePeople
-              .filter((person) => person.descriptors.length > 0)
-              .map((person) => (
-                <article className="person-row" key={person.id}>
-                  {person.imageDataUrl ? (
-                    <img src={person.imageDataUrl} alt="" />
-                  ) : (
-                    <div className="person-initial">{person.name.charAt(0)}</div>
-                  )}
-                  <div>
-                    <strong>{person.name}</strong>
-                    <span>
-                      {person.relation} - {person.group}
-                    </span>
-                    <p>{person.lastConversationSummary}</p>
+          {activeTab === 'visitor-schedule' && (
+            <div className="dashboard-grid">
+              <form className="panel-card form-card" onSubmit={handleScheduleVisitor}>
+                <div className="panel-head">
+                  <h2>Schedule a visitor briefing</h2>
+                  <p>Prepare the patient with context before a visit begins.</p>
+                </div>
+                <label>
+                  Visitor
+                  <select
+                    value={visitorPersonId}
+                    onChange={(event) => setVisitorPersonId(event.target.value)}
+                  >
+                    {people.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Visit date and time
+                  <input
+                    type="datetime-local"
+                    value={visitorDate}
+                    onChange={(event) => setVisitorDate(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Briefing context
+                  <textarea
+                    value={visitorContext}
+                    onChange={(event) => setVisitorContext(event.target.value)}
+                    placeholder="Sarah is visiting today. She has news about the Boston move and will bring photos."
+                  />
+                </label>
+                <button type="submit">Schedule visit</button>
+              </form>
+
+              <article className="panel-card">
+                <div className="panel-head">
+                  <h2>Upcoming visits</h2>
+                  <p>Weekly visitor schedule with briefing history.</p>
+                </div>
+                <div className="stack-list">
+                  {dashboard.visitorSchedule.map((visit) => {
+                    const person = people.find((item) => item.id === visit.personId)
+                    return (
+                      <div className="list-card" key={visit.id}>
+                        <strong>{person?.name ?? 'Unknown visitor'}</strong>
+                        <span>
+                          {formatDateTime(visit.visitDate)} · {visit.status}
+                        </span>
+                        <p>{visit.context}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </article>
+            </div>
+          )}
+
+          {activeTab === 'reminders' && (
+            <div className="dashboard-grid">
+              <form className="panel-card form-card" onSubmit={handleAddReminder}>
+                <div className="panel-head">
+                  <h2>Create reminder</h2>
+                  <p>Push a calm overlay directly into the patient view.</p>
+                </div>
+                <label>
+                  Title
+                  <input
+                    value={reminderTitle}
+                    onChange={(event) => setReminderTitle(event.target.value)}
+                    placeholder="Blood pressure tablet"
+                  />
+                </label>
+                <div className="form-grid">
+                  <label>
+                    Category
+                    <select
+                      value={selectedReminderCategory}
+                      onChange={(event) =>
+                        setSelectedReminderCategory(
+                          event.target.value as ReminderItem['category'],
+                        )
+                      }
+                    >
+                      {['Medication', 'Hydration', 'Exercise', 'Call', 'Other'].map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Priority
+                    <select
+                      value={reminderPriority}
+                      onChange={(event) =>
+                        setReminderPriority(event.target.value as ReminderItem['priority'])
+                      }
+                    >
+                      {['Low', 'Medium', 'High'].map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Schedule
+                  <input
+                    value={reminderSchedule}
+                    onChange={(event) => setReminderSchedule(event.target.value)}
+                    placeholder="Daily, 8:00 PM"
+                  />
+                </label>
+                <label>
+                  Overlay message
+                  <textarea
+                    value={reminderMessage}
+                    onChange={(event) => setReminderMessage(event.target.value)}
+                    placeholder="Time for your tablet. It is in the kitchen cabinet, top shelf."
+                  />
+                </label>
+                <button type="submit">Save reminder</button>
+              </form>
+
+              <article className="panel-card">
+                <div className="panel-head">
+                  <h2>Reminder queue</h2>
+                  <p>Track what was acknowledged, delayed, or missed.</p>
+                </div>
+                <div className="stack-list">
+                  {dashboard.reminders.map((reminder) => (
+                    <div className="list-card" key={reminder.id}>
+                      <strong>{reminder.title}</strong>
+                      <span>
+                        {reminder.category} · {reminder.scheduleLabel} · {reminder.status}
+                      </span>
+                      <p>{reminder.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+          )}
+
+          {activeTab === 'cognitive-report' && (
+            <div className="dashboard-stack">
+              <section className="metric-grid">
+                <article className="metric-card">
+                  <span>Overall cognitive score</span>
+                  <strong>{overviewStats.currentCognitiveScore}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Memory recall</span>
+                  <strong>{weeklyDimensions[3].score}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Speech coherence</span>
+                  <strong>{weeklyDimensions[2].score}</strong>
+                </article>
+              </section>
+
+              <section className="dashboard-grid">
+                <article className="panel-card">
+                  <div className="panel-head">
+                    <h2>Weekly dimensions</h2>
+                    <p>Simple demo view of the clinical trend model.</p>
+                  </div>
+                  <div className="score-list">
+                    {weeklyDimensions.map((dimension) => (
+                      <div className="score-row" key={dimension.label}>
+                        <span>{dimension.label}</span>
+                        <div>
+                          <b style={{ width: `${dimension.score}%` }} />
+                        </div>
+                        <strong>{dimension.score}</strong>
+                      </div>
+                    ))}
                   </div>
                 </article>
-              ))}
 
-            {visiblePeople.filter((person) => person.descriptors.length > 0)
-              .length === 0 && (
-              <p className="empty-people">No people in this group yet.</p>
-            )}
-          </div>
+                <article className="panel-card">
+                  <div className="panel-head">
+                    <h2>Clinical observations</h2>
+                    <p>AI and caretaker signals worth reviewing.</p>
+                  </div>
+                  <div className="stack-list">
+                    {dashboard.cognitiveObservations.map(
+                      (observation: CognitiveObservation) => (
+                        <div className="list-card" key={observation.id}>
+                          <strong>{observation.title}</strong>
+                          <span>
+                            {formatShortDate(observation.date)} · {observation.source} ·{' '}
+                            {observation.severity}
+                          </span>
+                          <p>{observation.actionTaken}</p>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </article>
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'safe-zone' && (
+            <div className="dashboard-grid">
+              <article className="panel-card form-card">
+                <div className="panel-head">
+                  <h2>Safe zone</h2>
+                  <p>Set the default geofence and trusted destinations.</p>
+                </div>
+                <label>
+                  Radius: {dashboard.safeZone.radiusMeters} meters
+                  <input
+                    type="range"
+                    min="100"
+                    max="2000"
+                    step="50"
+                    value={dashboard.safeZone.radiusMeters}
+                    onChange={(event) =>
+                      updateDashboard((current) => ({
+                        ...current,
+                        safeZone: {
+                          ...current.safeZone,
+                          radiusMeters: Number(event.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Trusted location
+                  <input
+                    value={trustedLocationDraft}
+                    onChange={(event) => setTrustedLocationDraft(event.target.value)}
+                    placeholder="Neighborhood park"
+                  />
+                </label>
+                <div className="inline-actions">
+                  <button type="button" onClick={handleAddTrustedLocation}>
+                    Add trusted location
+                  </button>
+                  <button type="button" onClick={handleSimulateExit}>
+                    Add demo exit event
+                  </button>
+                </div>
+              </article>
+
+              <article className="panel-card">
+                <div className="panel-head">
+                  <h2>Geofence history</h2>
+                  <p>Trusted places and recent exit events.</p>
+                </div>
+                <div className="detail-card">
+                  <label>Trusted locations</label>
+                  <div className="pill-row">
+                    {dashboard.safeZone.trustedLocations.map((location) => (
+                      <span className="pill" key={location}>
+                        {location}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="stack-list">
+                  {dashboard.safeZone.exitHistory.map((event) => (
+                    <div className="list-card" key={event.id}>
+                      <strong>{event.location}</strong>
+                      <span>
+                        {formatDateTime(event.time)} · {event.durationMinutes} minutes
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+          )}
+
+          {activeTab === 'sos-alerts' && (
+            <div className="dashboard-grid">
+              <article className="panel-card">
+                <div className="panel-head">
+                  <h2>SOS alerts</h2>
+                  <p>Review distress events and document resolution steps.</p>
+                </div>
+                <div className="stack-list">
+                  {dashboard.sosAlerts.map((alert: SosAlert) => (
+                    <div className="list-card" key={alert.id}>
+                      <strong>{alert.id}</strong>
+                      <span>
+                        {formatDateTime(alert.time)} · {alert.trigger} · {alert.status}
+                      </span>
+                      <p>{alert.transcript}</p>
+                      <small>{alert.location}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="panel-card form-card">
+                <div className="panel-head">
+                  <h2>Resolve latest alert</h2>
+                  <p>Add a note and mark the most recent alert as handled.</p>
+                </div>
+                <label>
+                  Resolution note
+                  <textarea
+                    value={sosNoteDraft}
+                    onChange={(event) => setSosNoteDraft(event.target.value)}
+                    placeholder="Caretaker contacted the patient and confirmed they were back inside."
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    dashboard.sosAlerts[0] && handleResolveAlert(dashboard.sosAlerts[0].id)
+                  }
+                >
+                  Mark latest alert resolved
+                </button>
+              </article>
+            </div>
+          )}
         </section>
       </section>
+
+      <p className="form-status caretaker-status">{status}</p>
     </main>
   )
 }

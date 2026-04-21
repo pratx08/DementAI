@@ -9,6 +9,12 @@ export type KnownPersonProfile = {
   group: string
   lastConversationSummary: string
   imageDataUrl?: string
+  phone?: string
+  notes?: string
+  expectedVisitDays?: string[]
+  lastVisitAt?: string
+  visitsThisMonth?: number
+  lastTranscript?: string
   descriptors: number[][]
 }
 
