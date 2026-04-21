@@ -122,13 +122,7 @@ export async function loadKnownPeople(): Promise<KnownPersonProfile[]> {
     return JSON.parse(storedPeople)
   }
 
-  const response = await fetch(appConfig.recognition.knownFacesPath)
-
-  if (!response.ok) {
-    throw new Error('Known faces data could not be loaded.')
-  }
-
-  return response.json()
+  return []
 }
 
 export function saveKnownPeople(people: KnownPersonProfile[]) {

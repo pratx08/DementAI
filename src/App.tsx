@@ -876,7 +876,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     useCamera('user')
   const [people, setPeople] = useState<KnownPersonProfile[]>([])
   const [dashboard, setDashboard] = useState<DashboardState | null>(null)
-  const [status, setStatus] = useState('Ready to manage MemoryBridge care workflows.')
+  const [status, setStatus] = useState('Ready.')
   const [activeTab, setActiveTab] = useState<CaretakerTab>('overview')
   const [mobileTabsOpen, setMobileTabsOpen] = useState(false)
   const [filter, setFilter] = useState('All')
@@ -1478,8 +1478,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     return (
       <main className="caretaker-shell">
         <section className="loading-panel">
-          <strong>Loading caretaker dashboard</strong>
-          <span>Preparing contacts, logs, and MemoryBridge workflows.</span>
+          <strong>Loading...</strong>
         </section>
       </main>
     )
@@ -1499,11 +1498,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
 
   return (
     <main className="caretaker-shell">
-      <header className="caretaker-header">
-        <div>
-          <p>MemoryBridge caretaker dashboard</p>
-          <h1>Clinical support workflows</h1>
-        </div>
+      <nav className="caretaker-header" aria-label="Caretaker navigation">
         <div className="header-actions">
           <button
             className="tabs-toggle"
@@ -1514,10 +1509,10 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
           </button>
           <button type="button" onClick={onLogout}>
             <ArrowLeft size={17} />
-            Login
+            Back
           </button>
         </div>
-      </header>
+      </nav>
 
       <section className="caretaker-workspace">
         <aside className={`tab-sidebar ${mobileTabsOpen ? 'is-open' : ''}`}>

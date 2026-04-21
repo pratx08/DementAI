@@ -1211,9 +1211,9 @@ body {
 
 .caretaker-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   max-width: 1360px;
   margin: 0 auto 18px;
 }
@@ -1231,7 +1231,7 @@ body {
 
 .caretaker-workspace {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: 18px;
   max-width: 1360px;
   margin: 0 auto;
@@ -1241,7 +1241,8 @@ body {
 .tab-sidebar {
   position: sticky;
   top: 24px;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
 }
@@ -1253,6 +1254,7 @@ body {
   min-height: 42px;
   padding: 10px 12px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .tab-button small {
@@ -1308,21 +1310,7 @@ body {
   font-size: clamp(1.65rem, 3vw, 2.4rem);
 }
 
-.panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.panel-head h2 {
-  margin: 0;
-  color: #163047;
-  font-size: 1.18rem;
-}
-
-.panel-head p,
+.panel-head,
 .caretaker-status,
 .form-status,
 .detail-card p,
@@ -1330,8 +1318,11 @@ body {
 .timeline-item span,
 .list-card span,
 .list-card small {
-  margin: 0;
   color: #5d7b92;
+}
+
+.panel-head {
+  display: none;
 }
 
 .form-card,
@@ -1554,11 +1545,11 @@ body {
   }
 
   .tab-sidebar.is-open {
-    display: grid;
+    display: flex;
   }
 
   .caretaker-header {
-    display: grid;
+    display: flex;
   }
 
   .header-actions {
