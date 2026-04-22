@@ -327,19 +327,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const resetWebTranscript = webSpeech.resetTranscript
 
   useEffect(() => {
-    const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (orientation: OrientationLockType) => Promise<void>
-      unlock?: () => void
-    }
-
-    orientation.lock?.('landscape').catch(() => undefined)
-
-    return () => {
-      orientation.unlock?.()
-    }
-  }, [])
-
-  useEffect(() => {
     faceAnchorRef.current = faceAnchor
   }, [faceAnchor])
 
