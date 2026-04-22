@@ -38,7 +38,13 @@ import {
   type SosAlert,
   type UnknownQueueItem,
 } from './services/dashboardData'
-import { hasHighValueContent, importanceScore, summarizeConversation } from './services/summary'
+import {
+  hasHighValueContent,
+  importanceScore,
+  isPlaceholderSummary,
+  mergeImportantSummaries,
+  summarizeConversation,
+} from './services/summary'
 import { fetchStoredSummary, persistSummary } from './services/mongoService'
 import type { CSSProperties, FormEvent } from 'react'
 import type { FaceBox } from './services/mediaPipeFaceDetection'
@@ -551,23 +557,21 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         computedSummariesRef.current.get(personId) ??
         recognizedRef.current?.lastConversationSummary ??
         ''
-      const isBlank =
-        !existing || existing === 'Conversation summary will appear here after the next visit.'
+      const isBlank = isPlaceholderSummary(existing)
 
       let finalSummary: string
 
       if (isBlank) {
-        // First time seeing this person — accept anything
         finalSummary = newSummary
       } else {
         const newScore = importanceScore(newSummary)
         const oldScore = importanceScore(existing)
+        const newIsImportant = hasHighValueContent(newSummary)
+        const oldIsImportant = hasHighValueContent(existing)
 
-        // Replace only when the new summary carries genuinely higher-value
-        // content (dates, appointments, medicine …) AND outscores the existing one.
-        // A casual greeting ("hello how are you") can never displace an
-        // appointment detail even if it's long.
-        if (hasHighValueContent(newSummary) && newScore > oldScore) {
+        if (newIsImportant && oldIsImportant) {
+          finalSummary = mergeImportantSummaries(existing, newSummary)
+        } else if (newIsImportant && (!oldIsImportant || newScore > oldScore)) {
           finalSummary = newSummary
         } else {
           finalSummary = existing

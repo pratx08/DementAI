@@ -37,6 +37,10 @@ export function hasHighValueContent(text: string): boolean {
   return HIGH_VALUE_PATTERNS.some((p) => p.test(text))
 }
 
+export function isPlaceholderSummary(text: string): boolean {
+  return !text.trim() || text === 'Conversation summary will appear here after the next visit.'
+}
+
 export function importanceScore(text: string): number {
   if (!text.trim()) return 0
 
@@ -69,6 +73,31 @@ function normalizeSummary(text: string) {
   }
 
   return cleaned.endsWith('.') ? cleaned : `${cleaned}.`
+}
+
+function splitSummaryParts(text: string) {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => normalizeSummary(part).trim())
+    .filter(Boolean)
+}
+
+export function mergeImportantSummaries(existing: string, incoming: string) {
+  const parts = [...splitSummaryParts(existing), ...splitSummaryParts(incoming)]
+  const seen = new Set<string>()
+
+  const deduped = parts.filter((part) => {
+    const key = part.toLowerCase()
+
+    if (seen.has(key)) {
+      return false
+    }
+
+    seen.add(key)
+    return true
+  })
+
+  return normalizeSummary(deduped.join(' '))
 }
 
 function fallbackSummary(transcript: string) {
@@ -140,4 +169,3 @@ export async function summarizeConversation(transcript: string) {
     return fallbackSummary(cleanTranscript)
   }
 }
-
