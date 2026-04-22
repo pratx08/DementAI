@@ -4,8 +4,8 @@ import { motion, LayoutGroup } from 'framer-motion'
 const LETTERS = ['D', 'E', 'M', 'E', 'N', 'T']
 const LETTER_STAGGER   = 0.07
 const SWAP_DELAY       = 1500  // ms — when IA → AI swap fires
-const SWAP_DURATION    = 520   // ms — how long the cross takes
-const BUTTON_DELAY     = SWAP_DELAY + SWAP_DURATION + 120 // appears only after swap settles
+const SWAP_DURATION    = 1100  // ms — how long the cross takes
+const BUTTON_DELAY     = SWAP_DELAY + SWAP_DURATION + 200 // appears only after swap settles
 
 export function LandingPage({ onStart }: { onStart: () => void }) {
   const [swapped, setSwapped]       = useState(false)
