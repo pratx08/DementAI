@@ -78,7 +78,6 @@ type FaceAnchor = {
 }
 
 type CaretakerTab =
-  | 'overview'
   | 'contacts'
   | 'daily-log'
   | 'unknown-queue'
@@ -947,8 +946,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const [people, setPeople] = useState<KnownPersonProfile[]>([])
   const [dashboard, setDashboard] = useState<DashboardState | null>(null)
   const [status, setStatus] = useState('Ready.')
-  const [activeTab, setActiveTab] = useState<CaretakerTab>('overview')
-  const [mobileTabsOpen, setMobileTabsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<CaretakerTab>('contacts')
   const [filter, setFilter] = useState('All')
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -1071,59 +1069,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
 
     return dashboard.dailyLog.filter((entry) => entry.type === logFilter)
   }, [dashboard, logFilter])
-
-  const overviewStats = useMemo(() => {
-    if (!dashboard) {
-      return {
-        peopleMetToday: 0,
-        pendingUnknowns: 0,
-        sosThisWeek: 0,
-        currentCognitiveScore: 84,
-      }
-    }
-
-    const today = new Date().toDateString()
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-    const peopleMetToday = dashboard.dailyLog.filter(
-      (entry) =>
-        entry.type === 'encounter' &&
-        new Date(entry.occurredAt).toDateString() === today,
-    ).length
-    const pendingUnknowns = dashboard.unknownQueue.filter(
-      (item) => item.status !== 'dismissed',
-    ).length
-    const sosThisWeek = dashboard.sosAlerts.filter(
-      (alert) => new Date(alert.time).getTime() >= weekAgo,
-    ).length
-    const confusionCount = dashboard.dailyLog.filter(
-      (entry) => entry.sentiment === 'Confused',
-    ).length
-    const positiveCount = dashboard.dailyLog.filter(
-      (entry) => entry.sentiment === 'Positive',
-    ).length
-
-    return {
-      peopleMetToday,
-      pendingUnknowns,
-      sosThisWeek,
-      currentCognitiveScore: Math.max(58, 82 + positiveCount * 2 - confusionCount * 5),
-    }
-  }, [dashboard])
-
-  const weeklyDimensions = useMemo(() => {
-    const encounterCount =
-      dashboard?.dailyLog.filter((entry) => entry.type === 'encounter').length ?? 0
-    const confusedCount =
-      dashboard?.dailyLog.filter((entry) => entry.sentiment === 'Confused').length ?? 0
-
-    return [
-      { label: 'Vocabulary', score: Math.max(50, 78 - confusedCount * 4) },
-      { label: 'Repetition', score: Math.max(42, 74 - confusedCount * 6) },
-      { label: 'Coherence', score: Math.max(46, 80 - confusedCount * 5) },
-      { label: 'Recall', score: Math.max(48, 76 + Math.min(encounterCount, 4)) },
-      { label: 'Fluency', score: Math.max(52, 79 - confusedCount * 3) },
-    ]
-  }, [dashboard])
 
   function updateDashboard(updater: (current: DashboardState) => DashboardState) {
     setDashboard((current) => (current ? updater(current) : current))
@@ -1426,7 +1371,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setSummary(item.snippet)
     setNotes(`Emotional state during flag: ${item.emotionalState}.`)
     setActiveTab('contacts')
-    setMobileTabsOpen(false)
     setStatus('Unknown visitor details moved into the contact form for review.')
   }
 
@@ -1535,29 +1479,21 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     )
   }
 
-  const tabs: { id: CaretakerTab; label: string; count?: number }[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'contacts', label: 'Contacts', count: people.length },
-    { id: 'daily-log', label: 'Daily Log', count: dashboard.dailyLog.length },
-    { id: 'unknown-queue', label: 'Unknown Queue', count: dashboard.unknownQueue.length },
-    { id: 'visitor-schedule', label: 'Visitor Schedule', count: dashboard.visitorSchedule.length },
-    { id: 'reminders', label: 'Reminders', count: dashboard.reminders.length },
+  const tabs: { id: CaretakerTab; label: string }[] = [
+    { id: 'contacts', label: 'Contacts' },
+    { id: 'daily-log', label: 'Daily Log' },
+    { id: 'unknown-queue', label: 'Unknown Queue' },
+    { id: 'visitor-schedule', label: 'Visitor Schedule' },
+    { id: 'reminders', label: 'Reminders' },
     { id: 'cognitive-report', label: 'Cognitive Report' },
     { id: 'safe-zone', label: 'Safe Zone' },
-    { id: 'sos-alerts', label: 'SOS Alerts', count: dashboard.sosAlerts.length },
+    { id: 'sos-alerts', label: 'SOS Alerts' },
   ]
 
   return (
     <main className="caretaker-shell">
       <nav className="caretaker-header" aria-label="Caretaker navigation">
         <div className="header-actions">
-          <button
-            className="tabs-toggle"
-            type="button"
-            onClick={() => setMobileTabsOpen((current) => !current)}
-          >
-            {mobileTabsOpen ? 'Close tabs' : 'Tabs'}
-          </button>
           <button type="button" onClick={onLogout}>
             <ArrowLeft size={17} />
             Back
@@ -1566,91 +1502,20 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
       </nav>
 
       <section className="caretaker-workspace">
-        <aside className={`tab-sidebar ${mobileTabsOpen ? 'is-open' : ''}`}>
+        <aside className="tab-sidebar">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               className={`tab-button ${activeTab === tab.id ? 'is-active' : ''}`}
               type="button"
-              onClick={() => {
-                setActiveTab(tab.id)
-                setMobileTabsOpen(false)
-              }}
+              onClick={() => setActiveTab(tab.id)}
             >
               <span>{tab.label}</span>
-              {typeof tab.count === 'number' && <small>{tab.count}</small>}
             </button>
           ))}
         </aside>
 
         <section className="tab-panel">
-          {activeTab === 'overview' && (
-            <div className="dashboard-stack">
-              <section className="metric-grid">
-                <article className="metric-card">
-                  <span>People met today</span>
-                  <strong>{overviewStats.peopleMetToday}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Pending unknown flags</span>
-                  <strong>{overviewStats.pendingUnknowns}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>SOS alerts this week</span>
-                  <strong>{overviewStats.sosThisWeek}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Current cognitive score</span>
-                  <strong>{overviewStats.currentCognitiveScore}</strong>
-                </article>
-              </section>
-
-              <section className="dashboard-grid">
-                <article className="panel-card">
-                  <div className="panel-head">
-                    <h2>Today at a glance</h2>
-                    <p>{dashboard.dailyLog.length} recent timeline entries</p>
-                  </div>
-                  <div className="stack-list">
-                    {dashboard.dailyLog.slice(0, 4).map((entry) => (
-                      <div className="list-card" key={entry.id}>
-                        <strong>{entry.title}</strong>
-                        <span>{formatDateTime(entry.occurredAt)}</span>
-                        <p>{entry.summary}</p>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-
-                <article className="panel-card">
-                  <div className="panel-head">
-                    <h2>Visitors and reminders</h2>
-                    <p>Next scheduled events for the patient</p>
-                  </div>
-                  <div className="stack-list">
-                    {dashboard.visitorSchedule.slice(0, 2).map((visit) => {
-                      const person = people.find((item) => item.id === visit.personId)
-                      return (
-                        <div className="list-card" key={visit.id}>
-                          <strong>{person?.name ?? 'Visitor'}</strong>
-                          <span>{formatDateTime(visit.visitDate)}</span>
-                          <p>{visit.context}</p>
-                        </div>
-                      )
-                    })}
-                    {dashboard.reminders.slice(0, 2).map((reminder) => (
-                      <div className="list-card" key={reminder.id}>
-                        <strong>{reminder.title}</strong>
-                        <span>{reminder.scheduleLabel}</span>
-                        <p>{reminder.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              </section>
-            </div>
-          )}
-
           {activeTab === 'contacts' && (
             <div className="dashboard-stack">
               <section className="dashboard-grid contacts-grid">
@@ -1923,14 +1788,18 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   ))}
                 </div>
                 <div className="timeline-list">
-                  {filteredDailyLog.map((entry) => (
-                    <div className="timeline-item" key={entry.id}>
-                      <strong>{entry.title}</strong>
-                      <span>{formatDateTime(entry.occurredAt)}</span>
-                      <p>{entry.summary}</p>
-                      {entry.sentiment && <small>Sentiment: {entry.sentiment}</small>}
-                    </div>
-                  ))}
+                  {filteredDailyLog.length === 0 ? (
+                    <p className="empty-people">No log items yet.</p>
+                  ) : (
+                    filteredDailyLog.map((entry) => (
+                      <div className="timeline-item" key={entry.id}>
+                        <strong>{entry.title}</strong>
+                        <span>{formatDateTime(entry.occurredAt)}</span>
+                        <p>{entry.summary}</p>
+                        {entry.sentiment && <small>Sentiment: {entry.sentiment}</small>}
+                      </div>
+                    ))
+                  )}
                 </div>
               </article>
 
@@ -1967,46 +1836,50 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                 <p>Review flagged visitors and decide how to handle them.</p>
               </div>
               <div className="stack-list">
-                {dashboard.unknownQueue.map((item) => (
-                  <div className="list-card" key={item.id}>
-                    <strong>{item.heardName}</strong>
-                    <span>
-                      {formatDateTime(item.flaggedAt)} · Emotion: {item.emotionalState}
-                    </span>
-                    <p>{item.snippet}</p>
-                    <div className="inline-actions">
-                      <button type="button" onClick={() => handleQueueToContact(item)}>
-                        Move to contact form
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateDashboard((current) => ({
-                            ...current,
-                            unknownQueue: current.unknownQueue.map((entry) =>
-                              entry.id === item.id ? { ...entry, status: 'follow-up' } : entry,
-                            ),
-                          }))
-                        }
-                      >
-                        Flag for follow-up
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateDashboard((current) => ({
-                            ...current,
-                            unknownQueue: current.unknownQueue.map((entry) =>
-                              entry.id === item.id ? { ...entry, status: 'dismissed' } : entry,
-                            ),
-                          }))
-                        }
-                      >
-                        Dismiss
-                      </button>
+                {dashboard.unknownQueue.length === 0 ? (
+                  <p className="empty-people">No flagged visitors yet.</p>
+                ) : (
+                  dashboard.unknownQueue.map((item) => (
+                    <div className="list-card" key={item.id}>
+                      <strong>{item.heardName}</strong>
+                      <span>
+                        {formatDateTime(item.flaggedAt)} · Emotion: {item.emotionalState}
+                      </span>
+                      <p>{item.snippet}</p>
+                      <div className="inline-actions">
+                        <button type="button" onClick={() => handleQueueToContact(item)}>
+                          Move to contact form
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateDashboard((current) => ({
+                              ...current,
+                              unknownQueue: current.unknownQueue.map((entry) =>
+                                entry.id === item.id ? { ...entry, status: 'follow-up' } : entry,
+                              ),
+                            }))
+                          }
+                        >
+                          Flag for follow-up
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateDashboard((current) => ({
+                              ...current,
+                              unknownQueue: current.unknownQueue.map((entry) =>
+                                entry.id === item.id ? { ...entry, status: 'dismissed' } : entry,
+                              ),
+                            }))
+                          }
+                        >
+                          Dismiss
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </article>
           )}
@@ -2056,18 +1929,22 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   <p>Weekly visitor schedule with briefing history.</p>
                 </div>
                 <div className="stack-list">
-                  {dashboard.visitorSchedule.map((visit) => {
-                    const person = people.find((item) => item.id === visit.personId)
-                    return (
-                      <div className="list-card" key={visit.id}>
-                        <strong>{person?.name ?? 'Unknown visitor'}</strong>
-                        <span>
-                          {formatDateTime(visit.visitDate)} · {visit.status}
-                        </span>
-                        <p>{visit.context}</p>
-                      </div>
-                    )
-                  })}
+                  {dashboard.visitorSchedule.length === 0 ? (
+                    <p className="empty-people">No scheduled visits yet.</p>
+                  ) : (
+                    dashboard.visitorSchedule.map((visit) => {
+                      const person = people.find((item) => item.id === visit.personId)
+                      return (
+                        <div className="list-card" key={visit.id}>
+                          <strong>{person?.name ?? 'Unknown visitor'}</strong>
+                          <span>
+                            {formatDateTime(visit.visitDate)} · {visit.status}
+                          </span>
+                          <p>{visit.context}</p>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               </article>
             </div>
@@ -2143,78 +2020,45 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   <p>Track what was acknowledged, delayed, or missed.</p>
                 </div>
                 <div className="stack-list">
-                  {dashboard.reminders.map((reminder) => (
-                    <div className="list-card" key={reminder.id}>
-                      <strong>{reminder.title}</strong>
-                      <span>
-                        {reminder.category} · {reminder.scheduleLabel} · {reminder.status}
-                      </span>
-                      <p>{reminder.message}</p>
-                    </div>
-                  ))}
+                  {dashboard.reminders.length === 0 ? (
+                    <p className="empty-people">No reminders yet.</p>
+                  ) : (
+                    dashboard.reminders.map((reminder) => (
+                      <div className="list-card" key={reminder.id}>
+                        <strong>{reminder.title}</strong>
+                        <span>
+                          {reminder.category} · {reminder.scheduleLabel} · {reminder.status}
+                        </span>
+                        <p>{reminder.message}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </article>
             </div>
           )}
 
           {activeTab === 'cognitive-report' && (
-            <div className="dashboard-stack">
-              <section className="metric-grid">
-                <article className="metric-card">
-                  <span>Overall cognitive score</span>
-                  <strong>{overviewStats.currentCognitiveScore}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Memory recall</span>
-                  <strong>{weeklyDimensions[3].score}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Speech coherence</span>
-                  <strong>{weeklyDimensions[2].score}</strong>
-                </article>
-              </section>
-
-              <section className="dashboard-grid">
-                <article className="panel-card">
-                  <div className="panel-head">
-                    <h2>Weekly dimensions</h2>
-                    <p>Simple demo view of the clinical trend model.</p>
-                  </div>
-                  <div className="score-list">
-                    {weeklyDimensions.map((dimension) => (
-                      <div className="score-row" key={dimension.label}>
-                        <span>{dimension.label}</span>
-                        <div>
-                          <b style={{ width: `${dimension.score}%` }} />
-                        </div>
-                        <strong>{dimension.score}</strong>
+            <article className="panel-card">
+              <div className="stack-list">
+                {dashboard.cognitiveObservations.length === 0 ? (
+                  <p className="empty-people">No cognitive items yet.</p>
+                ) : (
+                  dashboard.cognitiveObservations.map(
+                    (observation: CognitiveObservation) => (
+                      <div className="list-card" key={observation.id}>
+                        <strong>{observation.title}</strong>
+                        <span>
+                          {formatShortDate(observation.date)} · {observation.source} ·{' '}
+                          {observation.severity}
+                        </span>
+                        <p>{observation.actionTaken}</p>
                       </div>
-                    ))}
-                  </div>
-                </article>
-
-                <article className="panel-card">
-                  <div className="panel-head">
-                    <h2>Clinical observations</h2>
-                    <p>AI and caretaker signals worth reviewing.</p>
-                  </div>
-                  <div className="stack-list">
-                    {dashboard.cognitiveObservations.map(
-                      (observation: CognitiveObservation) => (
-                        <div className="list-card" key={observation.id}>
-                          <strong>{observation.title}</strong>
-                          <span>
-                            {formatShortDate(observation.date)} · {observation.source} ·{' '}
-                            {observation.severity}
-                          </span>
-                          <p>{observation.actionTaken}</p>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </article>
-              </section>
-            </div>
+                    ),
+                  )
+                )}
+              </div>
+            </article>
           )}
 
           {activeTab === 'safe-zone' && (
@@ -2274,14 +2118,18 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
                 <div className="stack-list">
-                  {dashboard.safeZone.exitHistory.map((event) => (
-                    <div className="list-card" key={event.id}>
-                      <strong>{event.location}</strong>
-                      <span>
-                        {formatDateTime(event.time)} · {event.durationMinutes} minutes
-                      </span>
-                    </div>
-                  ))}
+                  {dashboard.safeZone.exitHistory.length === 0 ? (
+                    <p className="empty-people">No exit history yet.</p>
+                  ) : (
+                    dashboard.safeZone.exitHistory.map((event) => (
+                      <div className="list-card" key={event.id}>
+                        <strong>{event.location}</strong>
+                        <span>
+                          {formatDateTime(event.time)} · {event.durationMinutes} minutes
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </article>
             </div>
@@ -2295,16 +2143,20 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   <p>Review distress events and document resolution steps.</p>
                 </div>
                 <div className="stack-list">
-                  {dashboard.sosAlerts.map((alert: SosAlert) => (
-                    <div className="list-card" key={alert.id}>
-                      <strong>{alert.id}</strong>
-                      <span>
-                        {formatDateTime(alert.time)} · {alert.trigger} · {alert.status}
-                      </span>
-                      <p>{alert.transcript}</p>
-                      <small>{alert.location}</small>
-                    </div>
-                  ))}
+                  {dashboard.sosAlerts.length === 0 ? (
+                    <p className="empty-people">No SOS alerts yet.</p>
+                  ) : (
+                    dashboard.sosAlerts.map((alert: SosAlert) => (
+                      <div className="list-card" key={alert.id}>
+                        <strong>{alert.id}</strong>
+                        <span>
+                          {formatDateTime(alert.time)} · {alert.trigger} · {alert.status}
+                        </span>
+                        <p>{alert.transcript}</p>
+                        <small>{alert.location}</small>
+                      </div>
+                    ))
+                  )}
                 </div>
               </article>
 
