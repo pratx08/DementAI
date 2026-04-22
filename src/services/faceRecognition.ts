@@ -2,6 +2,8 @@ import Human from '@vladmandic/human'
 import type { Config, Input } from '@vladmandic/human'
 import { appConfig } from '../config/appConfig'
 
+export const knownPeopleUpdatedEvent = 'dementai-known-people-updated'
+
 export type KnownPersonProfile = {
   id: string
   name: string
@@ -130,6 +132,8 @@ export function saveKnownPeople(people: KnownPersonProfile[]) {
     appConfig.recognition.peopleStorageKey,
     JSON.stringify(people),
   )
+
+  window.dispatchEvent(new CustomEvent(knownPeopleUpdatedEvent))
 }
 
 export function clearKnownPeople() {

@@ -21,6 +21,7 @@ import {
   clearKnownPeople,
   createDescriptorFromImage,
   identifyFace,
+  knownPeopleUpdatedEvent,
   loadFaceModels,
   loadKnownPeople,
   saveKnownPeople,
@@ -464,11 +465,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     window.addEventListener('focus', handleWindowFocus)
     window.addEventListener('storage', handleWindowFocus)
+    window.addEventListener(knownPeopleUpdatedEvent, handleWindowFocus)
 
     return () => {
       isMounted = false
       window.removeEventListener('focus', handleWindowFocus)
       window.removeEventListener('storage', handleWindowFocus)
+      window.removeEventListener(knownPeopleUpdatedEvent, handleWindowFocus)
     }
   }, [])
 
@@ -1299,6 +1302,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
       const summaryText = nextSummary.trim()
 
       setSummaryDraft(summaryText)
+      setSummary(summaryText)
       updatePerson(selectedContact.id, (person) => ({
         ...person,
         lastConversationSummary: summaryText,
@@ -1343,19 +1347,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     } finally {
       setIsSummarizing(false)
     }
-  }
-
-  function handleSaveManualSummary() {
-    if (!selectedContact || !summaryDraft.trim()) {
-      setStatus('Select a contact and add a summary first.')
-      return
-    }
-
-    updatePerson(selectedContact.id, (person) => ({
-      ...person,
-      lastConversationSummary: summaryDraft.trim(),
-    }))
-    setStatus(`Updated the memory card for ${selectedContact.name}.`)
   }
 
   function handleAddManualLog(event: FormEvent<HTMLFormElement>) {
@@ -1723,9 +1714,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                             placeholder="The latest summary shown on the patient card."
                           />
                         </label>
-                        <button type="button" onClick={handleSaveManualSummary}>
-                          Save summary to card
-                        </button>
                       </div>
                     </div>
                   )}
