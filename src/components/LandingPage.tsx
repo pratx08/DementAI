@@ -89,35 +89,32 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
           Memory, recognised.
         </motion.p>
 
-        {/* CTA button */}
-        <AnimatePresence>
-          {showButton && (
-            <motion.button
-              className="landing-cta"
-              initial={{ opacity: 0, scale: 0.9, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              onClick={onStart}
-              aria-label="Get started"
-            >
-              Get started
-              <svg
-                className="landing-cta-arrow"
-                viewBox="0 0 20 20"
-                fill="none"
-                aria-hidden
-              >
-                <path
-                  d="M4 10h12M11 5l5 5-5 5"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </motion.button>
-          )}
-        </AnimatePresence>
+        {/* CTA button — always in DOM so layout never shifts, opacity fades in */}
+        <motion.button
+          className="landing-cta"
+          animate={{ opacity: showButton ? 1 : 0 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+          style={{ pointerEvents: showButton ? 'auto' : 'none' }}
+          onClick={onStart}
+          aria-label="Get started"
+          tabIndex={showButton ? 0 : -1}
+        >
+          Get started
+          <svg
+            className="landing-cta-arrow"
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="M4 10h12M11 5l5 5-5 5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </motion.button>
       </div>
     </div>
   )
