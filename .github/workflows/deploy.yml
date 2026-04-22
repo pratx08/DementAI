@@ -32,8 +32,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_ATLAS_APP_ID: ${{ secrets.VITE_ATLAS_APP_ID }}
-          VITE_ATLAS_API_KEY: ${{ secrets.VITE_ATLAS_API_KEY }}
+          VITE_API_BASE_URL: https://dementai.onrender.com
 
       - name: Publish
         run: |
