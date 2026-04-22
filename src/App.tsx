@@ -88,7 +88,6 @@ type CaretakerTab =
   | 'sos-alerts'
 
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -443,8 +442,33 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     prepareRecognition()
 
+    async function refreshKnownPeople() {
+      try {
+        const people = await loadKnownPeople()
+
+        if (!isMounted) {
+          return
+        }
+
+        setKnownPeople(people)
+      } catch {
+        if (isMounted) {
+          setKnownPeople([])
+        }
+      }
+    }
+
+    function handleWindowFocus() {
+      refreshKnownPeople()
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+    window.addEventListener('storage', handleWindowFocus)
+
     return () => {
       isMounted = false
+      window.removeEventListener('focus', handleWindowFocus)
+      window.removeEventListener('storage', handleWindowFocus)
     }
   }, [])
 
@@ -953,9 +977,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const [name, setName] = useState('')
   const [relation, setRelation] = useState('')
   const [group, setGroup] = useState(groupOptions[0])
-  const [phone, setPhone] = useState('')
-  const [notes, setNotes] = useState('')
-  const [expectedVisitDays, setExpectedVisitDays] = useState<string[]>([])
   const [summary, setSummary] = useState('')
   const [selectedContactId, setSelectedContactId] = useState('')
   const [transcriptDraft, setTranscriptDraft] = useState('')
@@ -1078,9 +1099,13 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     personId: string,
     updater: (person: KnownPersonProfile) => KnownPersonProfile,
   ) {
-    setPeople((current) =>
-      current.map((person) => (person.id === personId ? updater(person) : person)),
-    )
+    setPeople((current) => {
+      const nextPeople = current.map((person) =>
+        person.id === personId ? updater(person) : person,
+      )
+      saveKnownPeople(nextPeople)
+      return nextPeople
+    })
   }
 
   function resetContactForm() {
@@ -1089,9 +1114,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setName('')
     setRelation('')
     setGroup(groupOptions[0])
-    setPhone('')
-    setNotes('')
-    setExpectedVisitDays([])
     setSummary('')
   }
 
@@ -1173,9 +1195,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         name: name.trim(),
         relation: relation.trim(),
         group,
-        phone: phone.trim(),
-        notes: notes.trim(),
-        expectedVisitDays,
         lastConversationSummary:
           summary.trim() ||
           'No conversation summary yet. Add one after the next visit.',
@@ -1369,7 +1388,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setName(item.heardName === 'No clear name' ? '' : item.heardName)
     setRelation('Visitor')
     setSummary(item.snippet)
-    setNotes(`Emotional state during flag: ${item.emotionalState}.`)
     setActiveTab('contacts')
     setStatus('Unknown visitor details moved into the contact form for review.')
   }
@@ -1594,46 +1612,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                         ))}
                       </select>
                     </label>
-                    <label>
-                      Phone
-                      <input
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                        placeholder="555-0199"
-                      />
-                    </label>
                   </div>
-
-                  <label>
-                    Expected visit days
-                    <div className="day-selector">
-                      {weekDays.map((day) => (
-                        <button
-                          key={day}
-                          className={expectedVisitDays.includes(day) ? 'is-active' : ''}
-                          type="button"
-                          onClick={() =>
-                            setExpectedVisitDays((current) =>
-                              current.includes(day)
-                                ? current.filter((item) => item !== day)
-                                : [...current, day],
-                            )
-                          }
-                        >
-                          {day}
-                        </button>
-                      ))}
-                    </div>
-                  </label>
-
-                  <label>
-                    Personal notes
-                    <textarea
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      placeholder="Favorite topics, medication context, or family updates."
-                    />
-                  </label>
 
                   <label>
                     Card conversation summary
@@ -1707,19 +1686,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                           Last visit {getRelativeTime(selectedContact.lastVisitAt)} ·{' '}
                           {selectedContact.visitsThisMonth ?? 0} visits this month
                         </p>
-                      </div>
-                      <div className="detail-grid">
-                        <div>
-                          <label>Phone</label>
-                          <p>{selectedContact.phone || 'No phone saved yet.'}</p>
-                        </div>
-                        <div>
-                          <label>Expected visits</label>
-                          <p>
-                            {selectedContact.expectedVisitDays?.join(', ') ||
-                              'No routine visit days saved.'}
-                          </p>
-                        </div>
                       </div>
                       <div className="summary-workflow">
                         <label>
