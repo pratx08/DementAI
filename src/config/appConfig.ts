@@ -14,6 +14,7 @@ export const appConfig = {
     dashboardStorageKey: 'dementai-dashboard-state',
     minRecognitionIntervalMs: 2200,
     minTrackingIntervalMs: 120,
+    speechPauseMs: 1800,
     matchSimilarityThreshold: 0.5,
   },
   mediaPipe: {

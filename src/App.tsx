@@ -613,7 +613,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     silenceTimerRef.current = window.setTimeout(() => {
       silenceTimerRef.current = null
       handleFaceSpeechStopped()
-    }, 3500)
+    }, appConfig.recognition.speechPauseMs)
   }, [handleFaceSpeechStopped])
 
   async function startNativeCaptions() {
