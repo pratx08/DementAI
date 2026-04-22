@@ -94,8 +94,52 @@ function splitSummaryParts(text: string) {
     .filter(Boolean)
 }
 
+function detectTopics(text: string) {
+  const lower = text.toLowerCase()
+  const topics = new Set<string>()
+
+  if (/\b(medicine|medication|pill|tablet|dose|pharmacy)\b/.test(lower)) {
+    topics.add('medication')
+  }
+
+  if (/\b(meet|meeting|walk|walking|appointment|doctor|clinic|hospital)\b/.test(lower)) {
+    topics.add('appointment')
+  }
+
+  if (/\b(call|phone|ring)\b/.test(lower)) {
+    topics.add('call')
+  }
+
+  if (/\b(visit|come|coming|bring|drop|pick)\b/.test(lower)) {
+    topics.add('visit')
+  }
+
+  if (/\b(remind|remember)\b/.test(lower)) {
+    topics.add('reminder')
+  }
+
+  return topics
+}
+
+function sharesTopic(left: string, right: string) {
+  const leftTopics = detectTopics(left)
+  const rightTopics = detectTopics(right)
+
+  if (leftTopics.size === 0 || rightTopics.size === 0) {
+    return false
+  }
+
+  return [...leftTopics].some((topic) => rightTopics.has(topic))
+}
+
 export function mergeImportantSummaries(existing: string, incoming: string) {
-  const parts = [...splitSummaryParts(existing), ...splitSummaryParts(incoming)]
+  const existingParts = splitSummaryParts(existing)
+  const incomingParts = splitSummaryParts(incoming)
+  const keptExisting = existingParts.filter(
+    (existingPart) =>
+      !incomingParts.some((incomingPart) => sharesTopic(existingPart, incomingPart)),
+  )
+  const parts = [...keptExisting, ...incomingParts]
   const seen = new Set<string>()
 
   const deduped = parts.filter((part) => {
