@@ -38,7 +38,8 @@ import {
   type SosAlert,
   type UnknownQueueItem,
 } from './services/dashboardData'
-import { importanceScore, summarizeConversation } from './services/summary'
+import { hasHighValueContent, importanceScore, summarizeConversation } from './services/summary'
+import { fetchStoredSummary, persistSummary } from './services/mongoService'
 import type { CSSProperties, FormEvent } from 'react'
 import type { FaceBox } from './services/mediaPipeFaceDetection'
 
@@ -311,6 +312,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const lastNativePartialRef = useRef('')
   const silenceTimerRef = useRef<number | null>(null)
   const isSummarizingFaceRef = useRef(false)
+  // Tracks the most recently persisted summary per personId so the
+  // comparison is never stale even before React state propagates.
+  const computedSummariesRef = useRef<Map<string, string>>(new Map())
   const [captionText, setCaptionText] = useState('')
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
@@ -353,15 +357,32 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     const prev = recognizedRef.current
     recognizedRef.current = recognized
 
-    if (prev?.id !== recognized?.id) {
-      speechTranscriptRef.current = ''
-      lastNativePartialRef.current = ''
-      setLiveFaceSummary(null)
-      if (silenceTimerRef.current) {
-        window.clearTimeout(silenceTimerRef.current)
-        silenceTimerRef.current = null
-      }
+    if (prev?.id === recognized?.id) return
+
+    // Person changed — reset all speech state
+    speechTranscriptRef.current = ''
+    lastNativePartialRef.current = ''
+    setLiveFaceSummary(null)
+    if (silenceTimerRef.current) {
+      window.clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
     }
+
+    if (!recognized) return
+
+    // Pull the persisted summary from MongoDB and show it right away.
+    // Falls back silently to whatever is already in localStorage.
+    const personId = recognized.id
+    fetchStoredSummary(personId).then((stored) => {
+      if (!stored) return
+      // Only apply if this person is still on screen
+      if (recognizedRef.current?.id !== personId) return
+      computedSummariesRef.current.set(personId, stored)
+      setLiveFaceSummary(stored)
+      setRecognized((current) =>
+        current?.id === personId ? { ...current, lastConversationSummary: stored } : current,
+      )
+    })
   }, [recognized])
 
   useEffect(() => {
@@ -516,51 +537,64 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     const transcript = speechTranscriptRef.current.trim()
     if (!person || transcript.length < 15) return
 
+    // Clear accumulator before the async work so new speech starts fresh
     speechTranscriptRef.current = ''
     isSummarizingFaceRef.current = true
 
     try {
       const newSummary = await summarizeConversation(transcript)
-      const existing = person.lastConversationSummary ?? ''
+
+      // Use computedSummariesRef as the source of truth — it's always current
+      // even when React state hasn't propagated yet between renders.
+      const personId = person.id
+      const existing =
+        computedSummariesRef.current.get(personId) ??
+        recognizedRef.current?.lastConversationSummary ??
+        ''
       const isBlank =
         !existing || existing === 'Conversation summary will appear here after the next visit.'
 
       let finalSummary: string
 
       if (isBlank) {
+        // First time seeing this person — accept anything
         finalSummary = newSummary
       } else {
         const newScore = importanceScore(newSummary)
         const oldScore = importanceScore(existing)
-        const maxScore = Math.max(newScore, oldScore)
-        const ratio = maxScore === 0 ? 1 : Math.min(newScore, oldScore) / maxScore
 
-        if (ratio >= 0.75) {
-          // Similar importance — merge both
-          finalSummary = await summarizeConversation(`${existing} ${newSummary}`)
-        } else if (newScore > oldScore) {
+        // Replace only when the new summary carries genuinely higher-value
+        // content (dates, appointments, medicine …) AND outscores the existing one.
+        // A casual greeting ("hello how are you") can never displace an
+        // appointment detail even if it's long.
+        if (hasHighValueContent(newSummary) && newScore > oldScore) {
           finalSummary = newSummary
         } else {
-          // Existing is more important — keep it
           finalSummary = existing
         }
       }
 
+      // Immediately record the decision so the next run sees the right value
+      computedSummariesRef.current.set(personId, finalSummary)
+
       setLiveFaceSummary(finalSummary)
       setRecognized((current) =>
-        current?.id === person.id
+        current?.id === personId
           ? { ...current, lastConversationSummary: finalSummary }
           : current,
       )
       setKnownPeople((current) => {
         const nextPeople = current.map((p) =>
-          p.id === person.id
+          p.id === personId
             ? { ...p, lastConversationSummary: finalSummary, lastVisitAt: new Date().toISOString() }
             : p,
         )
         saveKnownPeople(nextPeople)
         return nextPeople
       })
+
+      // Persist to MongoDB in the background — non-blocking
+      persistSummary(personId, person.name, finalSummary)
     } finally {
       isSummarizingFaceRef.current = false
     }

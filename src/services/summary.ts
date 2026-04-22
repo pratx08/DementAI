@@ -14,16 +14,47 @@ const STOP_WORDS = new Set([
   'just', 'more', 'also', 'then', 'than', 'into', 'over', 'after',
 ])
 
+// Pure social/greeting words — carry no card-worthy information
+const SOCIAL_WORDS = new Set([
+  'hello', 'hi', 'hey', 'bye', 'goodbye', 'goodnight', 'goodmorning',
+  'nice', 'great', 'good', 'fine', 'okay', 'ok', 'thanks', 'thank', 'please',
+  'sorry', 'welcome', 'sure', 'yeah', 'yes', 'nope', 'wow', 'oh', 'ah',
+  'well', 'right', 'really', 'very', 'much', 'lot', 'bit', 'thing',
+])
+
+// Patterns that signal genuinely important information worth keeping on the card
+const HIGH_VALUE_PATTERNS: RegExp[] = [
+  /\b(tomorrow|today|tonight|yesterday|next week|this week|last week)\b/i,
+  /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+  /\b(january|february|march|april|june|july|august|september|october|november|december)\b/i,
+  /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i,
+  /\b(appointment|meeting|doctor|hospital|clinic|pharmacy|medicine|medication|pill|tablet|dose)\b/i,
+  /\b(call|visit|come|bring|pick|drop|remind|remember)\b/i,
+  /\b\d{1,2}\/\d{1,2}\b/,
+]
+
+export function hasHighValueContent(text: string): boolean {
+  return HIGH_VALUE_PATTERNS.some((p) => p.test(text))
+}
+
 export function importanceScore(text: string): number {
   if (!text.trim()) return 0
-  const words = text
-    .toLowerCase()
+
+  const lower = text.toLowerCase()
+
+  // Each high-value pattern match is a strong signal
+  const patternBonus = HIGH_VALUE_PATTERNS.filter((p) => p.test(lower)).length * 6
+
+  // Count meaningful non-social, non-stop unique words
+  const words = lower
     .replace(/[^a-z\s]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w) && !SOCIAL_WORDS.has(w))
   const uniqueWords = new Set(words).size
+
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0).length
-  return uniqueWords * 3 + sentences * 2
+
+  return uniqueWords * 3 + sentences * 2 + patternBonus
 }
 
 let summarizerPromise: Promise<
