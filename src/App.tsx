@@ -29,6 +29,7 @@ import {
 import {
   loadDashboardState,
   saveDashboardState,
+  updateStoredDashboardState,
   type CognitiveObservation,
   type DashboardState,
   type DailyLogEntry,
@@ -213,6 +214,11 @@ function getRelativeTime(value?: string) {
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function inferHeardName(transcript: string) {
+  const match = transcript.match(/\b([A-Z][a-z]{2,})\b/)
+  return match?.[1] ?? 'No clear name'
 }
 
 function inferSentiment(transcript: string): DailyLogEntry['sentiment'] {
@@ -757,6 +763,65 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
   }, [knownPeople, videoRef])
 
+  function handlePatientFlag() {
+    const transcript = captionText.trim()
+    const heardName = inferHeardName(transcript)
+
+    updateStoredDashboardState((current) => ({
+      ...current,
+      unknownQueue: [
+        {
+          id: createLocalId('unknown'),
+          flaggedAt: new Date().toISOString(),
+          heardName,
+          snippet: transcript || 'Flagged from the patient view without spoken context yet.',
+          emotionalState: recognized ? 'Neutral' : 'Uncertain',
+          status: 'pending',
+        },
+        ...current.unknownQueue,
+      ],
+    }))
+
+    setMicStatus('Flag sent to caretaker.')
+  }
+
+  function handlePatientSos() {
+    const transcript = captionText.trim()
+    const location = showMap
+      ? `${appConfig.map.destinationLabel}`
+      : 'Patient camera view'
+
+    updateStoredDashboardState((current) => ({
+      ...current,
+      sosAlerts: [
+        {
+          id: createLocalId('sos'),
+          time: new Date().toISOString(),
+          trigger: 'Button pressed',
+          location,
+          transcript: transcript || 'SOS triggered from patient view.',
+          status: 'Open',
+          note: '',
+        },
+        ...current.sosAlerts,
+      ],
+      dailyLog: [
+        {
+          id: createLocalId('log'),
+          type: 'sos',
+          title: 'SOS triggered',
+          occurredAt: new Date().toISOString(),
+          summary: transcript || 'SOS triggered from patient view.',
+          location,
+          status: 'Open',
+        },
+        ...current.dailyLog,
+      ],
+    }))
+
+    setMicStatus('SOS sent to caretaker.')
+  }
+
   return (
     <main className="app-shell">
       <section
@@ -836,11 +901,16 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           >
             {micEnabled ? <Mic size={22} /> : <MicOff size={22} />}
           </button>
-          <button className="danger-action" type="button" aria-label="SOS">
+          <button
+            className="danger-action"
+            type="button"
+            aria-label="SOS"
+            onClick={handlePatientSos}
+          >
             <AlertTriangle size={23} />
             <span>SOS</span>
           </button>
-          <button type="button" aria-label="Flag person">
+          <button type="button" aria-label="Flag person" onClick={handlePatientFlag}>
             <Flag size={22} />
             <span>Flag</span>
           </button>
@@ -1440,25 +1510,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     }))
     setTrustedLocationDraft('')
     setStatus('Trusted location added to the safe zone.')
-  }
-
-  function handleSimulateExit() {
-    updateDashboard((current) => ({
-      ...current,
-      safeZone: {
-        ...current.safeZone,
-        exitHistory: [
-          {
-            id: createLocalId('exit'),
-            time: new Date().toISOString(),
-            location: 'New geofence exit event',
-            durationMinutes: 12,
-          },
-          ...current.safeZone.exitHistory,
-        ],
-      },
-    }))
-    setStatus('Added a demo geofence exit event.')
   }
 
   function handleResolveAlert(alertId: string) {
@@ -2203,9 +2254,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="inline-actions">
                   <button type="button" onClick={handleAddTrustedLocation}>
                     Add trusted location
-                  </button>
-                  <button type="button" onClick={handleSimulateExit}>
-                    Add demo exit event
                   </button>
                 </div>
               </article>

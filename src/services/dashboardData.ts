@@ -119,3 +119,12 @@ export function saveDashboardState(state: DashboardState) {
     JSON.stringify(state),
   )
 }
+
+export function updateStoredDashboardState(
+  updater: (current: DashboardState) => DashboardState,
+) {
+  const current = loadDashboardState([])
+  const next = updater(current)
+  saveDashboardState(next)
+  return next
+}
