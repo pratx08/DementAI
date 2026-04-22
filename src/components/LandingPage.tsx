@@ -1,95 +1,139 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, LayoutGroup } from 'framer-motion'
 
 const LETTERS = ['D', 'E', 'M', 'E', 'N', 'T']
-const LETTER_STAGGER = 0.07
-const SWAP_DELAY = 1600   // ms until IA → AI swap begins
-const BUTTON_DELAY = 2600 // ms until Get Started appears
+const LETTER_STAGGER   = 0.07
+const SWAP_DELAY       = 1500  // ms — when IA → AI swap fires
+const SWAP_DURATION    = 520   // ms — how long the cross takes
+const BUTTON_DELAY     = SWAP_DELAY + SWAP_DURATION + 120 // appears only after swap settles
 
 export function LandingPage({ onStart }: { onStart: () => void }) {
-  const [swapped, setSwapped] = useState(false)
+  const [swapped, setSwapped]       = useState(false)
   const [showButton, setShowButton] = useState(false)
 
   useEffect(() => {
-    const swapTimer = setTimeout(() => setSwapped(true), SWAP_DELAY)
-    const btnTimer = setTimeout(() => setShowButton(true), BUTTON_DELAY)
+    const swapTimer   = setTimeout(() => setSwapped(true),    SWAP_DELAY)
+    const buttonTimer = setTimeout(() => setShowButton(true), BUTTON_DELAY)
     return () => {
       clearTimeout(swapTimer)
-      clearTimeout(btnTimer)
+      clearTimeout(buttonTimer)
     }
   }, [])
 
   return (
     <div className="landing-shell">
-      {/* Ambient glow */}
       <div className="landing-glow" aria-hidden />
 
       <div className="landing-content">
-        {/* Wordmark */}
-        <div className="landing-wordmark" aria-label="DementAI">
-          {/* Staggered letters: D E M E N T */}
-          <span className="landing-fixed-letters" aria-hidden>
-            {LETTERS.map((letter, i) => (
-              <motion.span
-                key={i}
-                className="landing-letter"
-                initial={{ opacity: 0, y: 28 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: i * LETTER_STAGGER,
-                  duration: 0.5,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-              >
-                {letter}
-              </motion.span>
-            ))}
-          </span>
 
-          {/* Swapping suffix: IA → AI */}
-          <span className="landing-suffix-wrap" aria-hidden>
-            <AnimatePresence mode="wait">
-              {!swapped ? (
+        {/* ── Wordmark ─────────────────────────────────────── */}
+        <LayoutGroup id="wordmark">
+          <div className="landing-wordmark" aria-label="DementAI">
+
+            {/* Fixed letters: D E M E N T */}
+            <span className="landing-fixed-letters" aria-hidden>
+              {LETTERS.map((letter, i) => (
                 <motion.span
-                  key="ia"
+                  key={letter + i}
                   className="landing-letter"
                   initial={{ opacity: 0, y: 28 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20, filter: 'blur(6px)' }}
                   transition={{
-                    delay: LETTERS.length * LETTER_STAGGER,
+                    delay:    i * LETTER_STAGGER,
                     duration: 0.5,
-                    ease: [0.22, 1, 0.36, 1],
+                    ease:     [0.22, 1, 0.36, 1],
                   }}
                 >
-                  IA
+                  {letter}
                 </motion.span>
-              ) : (
-                <motion.span
-                  key="ai"
-                  className="landing-letter landing-letter--ai"
-                  initial={{ opacity: 0, y: 20, filter: 'blur(6px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  AI
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </span>
-        </div>
+              ))}
+            </span>
 
-        {/* Tagline */}
+            {/*
+              Suffix letters — they ALWAYS stay mounted.
+              When `swapped` flips, we reverse their DOM order inside the
+              flex container. Framer Motion's `layout` + `layoutId` detects
+              the position change and animates each letter to its new spot,
+              making them visually cross each other.
+            */}
+            <span className="landing-suffix-wrap" aria-hidden>
+              {!swapped ? (
+                /* ── DEMENTIA order: I then A ── */
+                <>
+                  <motion.span
+                    layoutId="letter-i"
+                    layout
+                    className="landing-letter"
+                    initial={{ opacity: 0, y: 28 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      layout:   { duration: SWAP_DURATION / 1000, ease: [0.22, 1, 0.36, 1] },
+                      opacity:  { delay: LETTERS.length * LETTER_STAGGER, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+                      y:        { delay: LETTERS.length * LETTER_STAGGER, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+                    }}
+                  >
+                    I
+                  </motion.span>
+                  <motion.span
+                    layoutId="letter-a"
+                    layout
+                    className="landing-letter"
+                    initial={{ opacity: 0, y: 28 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      layout:   { duration: SWAP_DURATION / 1000, ease: [0.22, 1, 0.36, 1] },
+                      opacity:  { delay: (LETTERS.length + 1) * LETTER_STAGGER, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+                      y:        { delay: (LETTERS.length + 1) * LETTER_STAGGER, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+                    }}
+                  >
+                    A
+                  </motion.span>
+                </>
+              ) : (
+                /* ── After swap: A then I  →  reads as "AI" ── */
+                <>
+                  <motion.span
+                    layoutId="letter-a"
+                    layout
+                    className="landing-letter landing-letter--ai"
+                    animate={{ color: '#36B37E' }}
+                    transition={{
+                      layout: { duration: SWAP_DURATION / 1000, ease: [0.22, 1, 0.36, 1] },
+                      color:  { duration: 0.35, delay: (SWAP_DURATION / 1000) * 0.5 },
+                    }}
+                  >
+                    A
+                  </motion.span>
+                  <motion.span
+                    layoutId="letter-i"
+                    layout
+                    className="landing-letter landing-letter--ai"
+                    animate={{ color: '#36B37E' }}
+                    transition={{
+                      layout: { duration: SWAP_DURATION / 1000, ease: [0.22, 1, 0.36, 1] },
+                      color:  { duration: 0.35, delay: (SWAP_DURATION / 1000) * 0.5 },
+                    }}
+                  >
+                    I
+                  </motion.span>
+                </>
+              )}
+            </span>
+
+          </div>
+        </LayoutGroup>
+
+        {/* ── Tagline — fades in once letters are swapped ── */}
         <motion.p
           className="landing-tagline"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: swapped ? 1 : 0, y: swapped ? 0 : 12 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: swapped ? 1 : 0, y: swapped ? 0 : 10 }}
+          transition={{ duration: 0.55, ease: 'easeOut' }}
         >
           Memory, recognised.
         </motion.p>
 
-        {/* CTA button — always in DOM so layout never shifts, opacity fades in */}
+        {/* ── CTA — always in DOM so layout never shifts ── */}
         <motion.button
           className="landing-cta"
           animate={{ opacity: showButton ? 1 : 0 }}
@@ -100,12 +144,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
           tabIndex={showButton ? 0 : -1}
         >
           Get started
-          <svg
-            className="landing-cta-arrow"
-            viewBox="0 0 20 20"
-            fill="none"
-            aria-hidden
-          >
+          <svg className="landing-cta-arrow" viewBox="0 0 20 20" fill="none" aria-hidden>
             <path
               d="M4 10h12M11 5l5 5-5 5"
               stroke="currentColor"
@@ -115,6 +154,7 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
             />
           </svg>
         </motion.button>
+
       </div>
     </div>
   )
