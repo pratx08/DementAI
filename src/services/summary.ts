@@ -85,6 +85,47 @@ function normalizeSummary(text: string) {
   return cleaned.endsWith('.') ? cleaned : `${cleaned}.`
 }
 
+function toSentenceCase(text: string) {
+  const trimmed = text.trim()
+
+  if (!trimmed) {
+    return ''
+  }
+
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
+function cleanSocialFiller(text: string) {
+  return text
+    .replace(/\b(hello|hi|hey|good morning|good afternoon|good evening|okay|ok|yeah|yes|nope|well)\b/gi, ' ')
+    .replace(/\b(this is not how i wanted|but yeah|you know|like)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,.\s]+|[,.\s]+$/g, '')
+    .trim()
+}
+
+function extractActionClause(text: string) {
+  const cleaned = cleanSocialFiller(text)
+
+  const actionMatch = cleaned.match(
+    /\b(meet|meeting|take|bring|call|visit|come|pick|drop|remind|remember)\b[\s\S]*$/i,
+  )
+
+  if (actionMatch) {
+    return actionMatch[0].trim()
+  }
+
+  const timeMatch = cleaned.match(
+    /\b(tomorrow|today|tonight|next week|this week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b[\s\S]*$/i,
+  )
+
+  if (timeMatch) {
+    return timeMatch[0].trim()
+  }
+
+  return cleaned
+}
+
 function splitSummaryParts(text: string) {
   return text
     .split(/(?<=[.!?])\s+/)
@@ -189,14 +230,18 @@ function fallbackSummary(transcript: string) {
     .filter(Boolean)
 
   if (sentences.length === 0) {
-    return normalizeSummary(transcript.slice(0, 140))
+    return normalizeSummary(toSentenceCase(extractActionClause(transcript.slice(0, 140))))
   }
 
   if (sentences.length === 1) {
-    return normalizeSummary(sentences[0])
+    return normalizeSummary(toSentenceCase(extractActionClause(sentences[0])))
   }
 
-  return normalizeSummary(`${sentences[0]} ${sentences[Math.min(1, sentences.length - 1)]}`)
+  const combined = `${extractActionClause(sentences[0])} ${extractActionClause(
+    sentences[Math.min(1, sentences.length - 1)],
+  )}`
+
+  return normalizeSummary(toSentenceCase(combined))
 }
 
 async function getSummarizer() {
