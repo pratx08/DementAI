@@ -15,6 +15,7 @@ export const appConfig = {
     minRecognitionIntervalMs: 2200,
     minTrackingIntervalMs: 120,
     speechPauseMs: 1800,
+    captionHoldMs: 1000,
     matchSimilarityThreshold: 0.5,
   },
   mediaPipe: {

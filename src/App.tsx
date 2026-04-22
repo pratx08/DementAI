@@ -440,7 +440,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('')
       resetWebTranscript()
-    }, 5000)
+    }, appConfig.recognition.captionHoldMs)
 
     return () => {
       if (captionTimerRef.current) {
