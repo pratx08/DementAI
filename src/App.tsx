@@ -40,6 +40,7 @@ import {
 } from './services/dashboardData'
 import {
   choosePrioritySummary,
+  DEFAULT_SUMMARY,
   isPlaceholderSummary,
   summarizeConversation,
 } from './services/summary'
@@ -366,7 +367,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     // Person changed — reset all speech state
     speechTranscriptRef.current = ''
     lastNativePartialRef.current = ''
-    setLiveFaceSummary(recognized?.lastConversationSummary ?? null)
+    setLiveFaceSummary(recognized ? DEFAULT_SUMMARY : null)
     if (silenceTimerRef.current) {
       window.clearTimeout(silenceTimerRef.current)
       silenceTimerRef.current = null
@@ -378,21 +379,17 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     // Falls back silently to whatever is already in localStorage.
     const personId = recognized.id
     fetchStoredSummary(personId).then((stored) => {
-      if (!stored) return
       // Only apply if this person is still on screen
       if (recognizedRef.current?.id !== personId) return
-      const currentSummary =
-        computedSummariesRef.current.get(personId) ??
-        recognizedRef.current?.lastConversationSummary ??
-        ''
-      const resolvedSummary = choosePrioritySummary(currentSummary, stored)
-      computedSummariesRef.current.set(personId, resolvedSummary)
+      const resolvedSummary = stored?.trim() || DEFAULT_SUMMARY
+
+      if (isPlaceholderSummary(resolvedSummary)) {
+        computedSummariesRef.current.delete(personId)
+      } else {
+        computedSummariesRef.current.set(personId, resolvedSummary)
+      }
+
       setLiveFaceSummary(resolvedSummary)
-      setRecognized((current) =>
-        current?.id === personId
-          ? { ...current, lastConversationSummary: resolvedSummary }
-          : current,
-      )
     })
   }, [recognized])
 
@@ -485,14 +482,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         const [people] = await Promise.all([loadKnownPeople(), loadFaceModels()])
 
         if (isMounted) {
-          people.forEach((person) => {
-            if (!isPlaceholderSummary(person.lastConversationSummary)) {
-              computedSummariesRef.current.set(
-                person.id,
-                person.lastConversationSummary,
-              )
-            }
-          })
           setKnownPeople(people)
         }
       } catch {
@@ -568,7 +557,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       const personId = person.id
       const existing =
         computedSummariesRef.current.get(personId) ??
-        recognizedRef.current?.lastConversationSummary ??
         ''
       const isBlank = isPlaceholderSummary(existing)
 
@@ -584,11 +572,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       computedSummariesRef.current.set(personId, finalSummary)
 
       setLiveFaceSummary(finalSummary)
-      setRecognized((current) =>
-        current?.id === personId
-          ? { ...current, lastConversationSummary: finalSummary }
-          : current,
-      )
       setKnownPeople((current) => {
         const nextPeople = current.map((p) =>
           p.id === personId
@@ -1046,7 +1029,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
               <p>{recognized.relation}</p>
               <h1>{recognized.name}</h1>
             </header>
-            <p>{liveFaceSummary ?? recognized.lastConversationSummary}</p>
+            <p>{liveFaceSummary ?? DEFAULT_SUMMARY}</p>
           </aside>
         )}
 

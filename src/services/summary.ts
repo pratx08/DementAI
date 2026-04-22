@@ -3,6 +3,9 @@ type SummaryResult = {
   generated_text?: string
 }
 
+export const DEFAULT_SUMMARY =
+  'Conversation summary will appear here after the next visit.'
+
 const STOP_WORDS = new Set([
   'i', 'the', 'a', 'an', 'and', 'or', 'but', 'is', 'was', 'are', 'were',
   'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
@@ -42,7 +45,7 @@ export function isPlaceholderSummary(text: string): boolean {
 
   return (
     !normalized ||
-    normalized === 'conversation summary will appear here after the next visit.' ||
+    normalized === DEFAULT_SUMMARY.toLowerCase() ||
     normalized === 'no conversation summary yet. add one after the next visit.' ||
     normalized.startsWith('no conversation summary yet')
   )
@@ -76,7 +79,7 @@ function normalizeSummary(text: string) {
   const cleaned = text.replace(/\s+/g, ' ').trim()
 
   if (!cleaned) {
-    return 'Conversation summary will appear here after the next visit.'
+    return DEFAULT_SUMMARY
   }
 
   return cleaned.endsWith('.') ? cleaned : `${cleaned}.`
