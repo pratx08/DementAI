@@ -1002,6 +1002,8 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const [sosNoteDraft, setSosNoteDraft] = useState('')
   const [noteListening, setNoteListening] = useState(false)
   const noteRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const transcriptDraftRef = useRef('')
+  const autoSummarizeOnStopRef = useRef(false)
   const didLoadRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -1074,11 +1076,13 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     if (!selectedContact) {
       setTranscriptDraft('')
+      transcriptDraftRef.current = ''
       setSummaryDraft('')
       return
     }
 
     setTranscriptDraft(selectedContact.lastTranscript ?? '')
+    transcriptDraftRef.current = selectedContact.lastTranscript ?? ''
     setSummaryDraft(selectedContact.lastConversationSummary)
   }, [selectedContact])
 
@@ -1118,6 +1122,71 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setRelation('')
     setGroup(groupOptions[0])
     setSummary('')
+  }
+
+  async function generateSummaryFromTranscript(transcript: string) {
+    if (!selectedContact || !transcript.trim()) {
+      setStatus('Start the note mic and speak before saving the card summary.')
+      return
+    }
+
+    setIsSummarizing(true)
+    setStatus('Turning speech into a card summary...')
+
+    try {
+      const cleanTranscript = transcript.trim()
+      const nextSummary = await summarizeConversation(cleanTranscript)
+      const sentiment = inferSentiment(cleanTranscript)
+      const summaryText = nextSummary.trim()
+
+      setTranscriptDraft(cleanTranscript)
+      transcriptDraftRef.current = cleanTranscript
+      setSummaryDraft(summaryText)
+      setSummary(summaryText)
+      updatePerson(selectedContact.id, (person) => ({
+        ...person,
+        lastConversationSummary: summaryText,
+        lastTranscript: cleanTranscript,
+        lastVisitAt: new Date().toISOString(),
+        visitsThisMonth: (person.visitsThisMonth ?? 0) + 1,
+      }))
+      updateDashboard((current) => ({
+        ...current,
+        dailyLog: [
+          {
+            id: createLocalId('log'),
+            type: 'encounter',
+            title: selectedContact.name,
+            personId: selectedContact.id,
+            relationship: selectedContact.relation,
+            occurredAt: new Date().toISOString(),
+            durationMinutes: Math.max(5, Math.round(cleanTranscript.split(/\s+/).length / 18)),
+            sentiment,
+            summary: summaryText,
+            transcript: cleanTranscript,
+            location: 'Patient home',
+          },
+          ...current.dailyLog,
+        ],
+        cognitiveObservations:
+          sentiment === 'Confused'
+            ? [
+                {
+                  id: createLocalId('obs'),
+                  date: new Date().toISOString(),
+                  title: `Confusion cue during conversation with ${selectedContact.name}`,
+                  source: 'AI',
+                  severity: 'Medium',
+                  actionTaken: 'Review transcript and compare with next visit.',
+                },
+                ...current.cognitiveObservations,
+              ]
+            : current.cognitiveObservations,
+      }))
+      setStatus(`Saved a new card summary for ${selectedContact.name}.`)
+    } finally {
+      setIsSummarizing(false)
+    }
   }
 
   async function handleImageChange(file: File | null) {
@@ -1264,14 +1333,25 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
           nextTranscript += `${event.results[index][0]?.transcript ?? ''} `
         }
 
-        setTranscriptDraft((current) => `${current} ${nextTranscript}`.trim())
+        setTranscriptDraft((current) => {
+          const combined = `${current} ${nextTranscript}`.trim()
+          transcriptDraftRef.current = combined
+          return combined
+        })
       }
       recognition.onerror = () => {
         setNoteListening(false)
+        autoSummarizeOnStopRef.current = false
         setStatus('Microphone transcription stopped. Tap the button to try again.')
       }
       recognition.onend = () => {
         setNoteListening(false)
+        const shouldSummarize = autoSummarizeOnStopRef.current
+        autoSummarizeOnStopRef.current = false
+
+        if (shouldSummarize && transcriptDraftRef.current.trim()) {
+          void generateSummaryFromTranscript(transcriptDraftRef.current)
+        }
       }
       noteRecognitionRef.current = recognition
       recognition.start()
@@ -1283,70 +1363,13 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   }
 
   function handleStopContactTranscript() {
+    autoSummarizeOnStopRef.current = true
     noteRecognitionRef.current?.stop()
     setNoteListening(false)
   }
 
   async function handleGenerateSummary() {
-    if (!selectedContact || !transcriptDraft.trim()) {
-      setStatus('Add or dictate visit notes before generating a summary.')
-      return
-    }
-
-    setIsSummarizing(true)
-    setStatus('Generating a lightweight local summary for the memory card...')
-
-    try {
-      const nextSummary = await summarizeConversation(transcriptDraft)
-      const sentiment = inferSentiment(transcriptDraft)
-      const summaryText = nextSummary.trim()
-
-      setSummaryDraft(summaryText)
-      setSummary(summaryText)
-      updatePerson(selectedContact.id, (person) => ({
-        ...person,
-        lastConversationSummary: summaryText,
-        lastTranscript: transcriptDraft.trim(),
-        lastVisitAt: new Date().toISOString(),
-        visitsThisMonth: (person.visitsThisMonth ?? 0) + 1,
-      }))
-      updateDashboard((current) => ({
-        ...current,
-        dailyLog: [
-          {
-            id: createLocalId('log'),
-            type: 'encounter',
-            title: selectedContact.name,
-            personId: selectedContact.id,
-            relationship: selectedContact.relation,
-            occurredAt: new Date().toISOString(),
-            durationMinutes: Math.max(5, Math.round(transcriptDraft.split(/\s+/).length / 18)),
-            sentiment,
-            summary: summaryText,
-            transcript: transcriptDraft.trim(),
-            location: 'Patient home',
-          },
-          ...current.dailyLog,
-        ],
-        cognitiveObservations:
-          sentiment === 'Confused'
-            ? [
-                {
-                  id: createLocalId('obs'),
-                  date: new Date().toISOString(),
-                  title: `Confusion cue during conversation with ${selectedContact.name}`,
-                  source: 'AI',
-                  severity: 'Medium',
-                  actionTaken: 'Review transcript and compare with next visit.',
-                },
-                ...current.cognitiveObservations,
-              ]
-            : current.cognitiveObservations,
-      }))
-      setStatus(`Saved a new card summary for ${selectedContact.name}.`)
-    } finally {
-      setIsSummarizing(false)
-    }
+    await generateSummaryFromTranscript(transcriptDraftRef.current || transcriptDraft)
   }
 
   function handleAddManualLog(event: FormEvent<HTMLFormElement>) {
@@ -1683,8 +1706,11 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                           Visit transcript
                           <textarea
                             value={transcriptDraft}
-                            onChange={(event) => setTranscriptDraft(event.target.value)}
-                            placeholder="Paste or dictate the latest conversation here."
+                            onChange={(event) => {
+                              setTranscriptDraft(event.target.value)
+                              transcriptDraftRef.current = event.target.value
+                            }}
+                            placeholder="Use the note mic and speak naturally."
                           />
                         </label>
                         <div className="inline-actions">
@@ -1696,7 +1722,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                                 : handleStartContactTranscript
                             }
                           >
-                            {noteListening ? 'Stop note mic' : 'Start note mic'}
+                            {noteListening ? 'Stop and save' : 'Start note mic'}
                           </button>
                           <button
                             type="button"
