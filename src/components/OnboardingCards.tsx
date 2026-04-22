@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+const assetPath = (path: string) =>
+  `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+
 // ─── Company detail data ────────────────────────────────────────
 type Company = {
   id: string
@@ -21,8 +24,8 @@ const COMPANIES: Company[] = [
     tag: '£1M Prize · Dementia Tech',
     sourceLabel: 'The Guardian',
     sourceUrl: 'https://www.theguardian.com/society/2026/mar/18/ai-smart-glasses-1m-prize-technology-dementia',
-    imageSrc: '/competitors/guardian-cover.jpg',
-    videoSrc: '/competitors/guardian-video.mp4',
+    imageSrc: assetPath('competitors/guardian-cover.jpg'),
+    videoSrc: assetPath('competitors/guardian-video.mp4'),
     accent: '#F5A623',
   },
   {
@@ -31,8 +34,8 @@ const COMPANIES: Company[] = [
     tag: 'MedaCareLLM · AI Glasses',
     sourceLabel: 'Healthcare Digital',
     sourceUrl: 'https://healthcare-digital.com/technology-and-ai/careyayas-medacarellm-ai-glasses-support-dementia-patients',
-    imageSrc: '/competitors/careyaya-cover.jpg',
-    videoSrc: '/competitors/careyaya-video.mp4',
+    imageSrc: assetPath('competitors/careyaya-cover.jpg'),
+    videoSrc: assetPath('competitors/careyaya-video.mp4'),
     accent: '#C471ED',
   },
 ]
@@ -122,6 +125,9 @@ const DETAIL_VARIANTS = {
 
 // ─── Company detail view ────────────────────────────────────────
 function CompanyDetail({ company, onBack }: { company: Company; onBack: () => void }) {
+  const [imageReady, setImageReady] = useState(false)
+  const [videoReady, setVideoReady] = useState(false)
+
   return (
     <motion.div
       className="cd-shell"
@@ -169,9 +175,11 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
           className="cd-image"
           src={company.imageSrc}
           alt={`${company.name} cover`}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          onLoad={() => setImageReady(true)}
+          onError={() => setImageReady(false)}
         />
-        <div className="cd-image-placeholder" aria-hidden>
+        {!imageReady && (
+          <div className="cd-image-placeholder" aria-hidden>
           <svg viewBox="0 0 48 48" fill="none">
             <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
             <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="1.8" />
@@ -179,7 +187,8 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span>Add image to<br /><code>public/competitors/{company.id}-cover.jpg</code></span>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Video placeholder */}
@@ -189,16 +198,19 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
           src={company.videoSrc}
           controls
           playsInline
-          onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = 'none' }}
+          onLoadedData={() => setVideoReady(true)}
+          onError={() => setVideoReady(false)}
         />
-        <div className="cd-video-placeholder" aria-hidden>
+        {!videoReady && (
+          <div className="cd-video-placeholder" aria-hidden>
           <svg viewBox="0 0 48 48" fill="none">
             <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
             <path d="M20 18l12 6-12 6V18Z" stroke="currentColor" strokeWidth="1.8"
               strokeLinejoin="round" />
           </svg>
           <span>Add video to<br /><code>public/competitors/{company.id}-video.mp4</code></span>
-        </div>
+          </div>
+        )}
       </div>
     </motion.div>
   )
