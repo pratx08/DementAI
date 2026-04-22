@@ -1583,3 +1583,288 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── Landing Page ──────────────────────────────────────────── */
+
+.landing-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100svh;
+  background: #050706;
+  overflow: hidden;
+  /* Respect iPhone notch / Dynamic Island */
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    max(40px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+}
+
+.landing-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 40%, rgba(54, 179, 126, 0.13), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 20% 80%, rgba(91, 141, 239, 0.07), transparent 60%);
+  pointer-events: none;
+}
+
+.landing-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+}
+
+/* Title wordmark */
+.landing-wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  line-height: 1;
+  font-size: clamp(3.6rem, 14vw, 7rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #f7fff9;
+  user-select: none;
+}
+
+.landing-fixed-letters {
+  display: flex;
+}
+
+.landing-letter {
+  display: inline-block;
+}
+
+.landing-letter--ai {
+  color: #36B37E;
+}
+
+.landing-suffix-wrap {
+  position: relative;
+  display: inline-flex;
+  min-width: 2ch;
+}
+
+/* Tagline */
+.landing-tagline {
+  margin: clamp(16px, 4vw, 24px) 0 0;
+  font-size: clamp(0.95rem, 3vw, 1.15rem);
+  font-weight: 400;
+  color: rgba(247, 255, 249, 0.42);
+  letter-spacing: 0.01em;
+}
+
+/* CTA button */
+.landing-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: clamp(32px, 8vw, 52px);
+  padding: 15px 32px;
+  background: #36B37E;
+  color: #050706;
+  font-size: clamp(0.95rem, 2.8vw, 1.05rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.landing-cta:active {
+  background: #2e9d6e;
+}
+
+.landing-cta-arrow {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* ─── Onboarding Cards ──────────────────────────────────────── */
+
+.ob-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100svh;
+  background: #050706;
+  overflow: hidden;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(32px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  gap: 28px;
+}
+
+.ob-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 50% at 50% 30%, rgba(54, 179, 126, 0.08), transparent 65%);
+  pointer-events: none;
+}
+
+/* Stage that holds the animated card */
+.ob-stage {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* The card itself */
+.ob-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(28px, 6vw, 44px);
+  background: #0d0d0d;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 28px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 40px 80px rgba(0, 0, 0, 0.5);
+  will-change: transform, opacity;
+}
+
+/* Step counter */
+.ob-step {
+  margin: 0 0 clamp(20px, 5vw, 32px);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Icon */
+.ob-icon-wrap {
+  margin-bottom: clamp(20px, 5vw, 28px);
+}
+
+.ob-icon {
+  width: clamp(44px, 10vw, 56px);
+  height: clamp(44px, 10vw, 56px);
+  display: block;
+}
+
+/* Card text */
+.ob-title {
+  margin: 0 0 clamp(10px, 3vw, 16px);
+  font-size: clamp(1.55rem, 5.5vw, 2rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #f7fff9;
+}
+
+.ob-body {
+  margin: 0;
+  font-size: clamp(0.9rem, 2.8vw, 1rem);
+  font-weight: 400;
+  line-height: 1.65;
+  color: rgba(247, 255, 249, 0.5);
+}
+
+/* Navigation row */
+.ob-nav {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+/* Progress dots */
+.ob-dots {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.ob-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.ob-dot--active {
+  transform: scale(1.35);
+  /* background set inline via accent color */
+}
+
+/* Next / Begin button */
+.ob-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  color: #050706;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ob-next svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.ob-next-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 0 6px;
+}
+
+.ob-next:active {
+  opacity: 0.85;
+}
+
+/* ─── Responsive tweaks for landing + onboarding ───────────── */
+
+@media (max-width: 430px) {
+  /* Tighter card padding on narrow phones */
+  .ob-card {
+    border-radius: 22px;
+  }
+
+  /* Keep nav flush with card on very small screens */
+  .ob-nav {
+    padding: 0 2px;
+  }
+}
+
+@media (min-height: 800px) {
+  /* Give the card more breathing room on tall phones (iPhone Pro) */
+  .ob-shell {
+    gap: 36px;
+  }
+}

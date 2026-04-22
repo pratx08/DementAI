@@ -15,6 +15,8 @@ import {
   Upload,
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
+import { LandingPage } from './components/LandingPage'
+import { OnboardingCards } from './components/OnboardingCards'
 import { DirectionsMap } from './components/DirectionsMap'
 import { useCamera } from './hooks/useCamera'
 import {
@@ -48,6 +50,7 @@ import { fetchStoredSummary, persistSummary } from './services/mongoService'
 import type { CSSProperties, FormEvent } from 'react'
 import type { FaceBox } from './services/mediaPipeFaceDetection'
 
+type AppStage = 'landing' | 'onboarding' | 'app'
 type UserRole = 'patient' | 'caretaker'
 type FaceDetectionApi = typeof import('./services/mediaPipeFaceDetection')
 type BrowserSpeechRecognitionResult = {
@@ -249,7 +252,16 @@ function inferSentiment(transcript: string): DailyLogEntry['sentiment'] {
 }
 
 function App() {
+  const [stage, setStage] = useState<AppStage>('landing')
   const [role, setRole] = useState<UserRole | null>(null)
+
+  if (stage === 'landing') {
+    return <LandingPage onStart={() => setStage('onboarding')} />
+  }
+
+  if (stage === 'onboarding') {
+    return <OnboardingCards onDone={() => setStage('app')} />
+  }
 
   if (!role) {
     return <LoginScreen onSelectRole={setRole} />
