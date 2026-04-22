@@ -315,6 +315,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const recognizedRef = useRef<KnownPersonProfile | null>(null)
   const speechTranscriptRef = useRef('')
   const lastNativePartialRef = useRef('')
+  const lastDismissedCaptionRef = useRef<{ text: string; time: number } | null>(null)
   const silenceTimerRef = useRef<number | null>(null)
   const isSummarizingFaceRef = useRef(false)
   // Tracks the most recently persisted summary per personId so the
@@ -340,6 +341,27 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     webSpeech.finalTranscript || webSpeech.transcript,
   )
   const resetWebTranscript = webSpeech.resetTranscript
+
+  const applyCaptionText = useCallback((text: string) => {
+    const trimmed = text.trim()
+
+    if (!trimmed) {
+      return
+    }
+
+    const lastDismissed = lastDismissedCaptionRef.current
+    const isImmediateReplay =
+      lastDismissed &&
+      lastDismissed.text === trimmed &&
+      Date.now() - lastDismissed.time < 2200
+
+    if (isImmediateReplay) {
+      return
+    }
+
+    lastDismissedCaptionRef.current = null
+    setCaptionText(trimmed)
+  }, [])
 
   useEffect(() => {
     const orientation = screen.orientation as ScreenOrientation & {
@@ -438,6 +460,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
 
     captionTimerRef.current = window.setTimeout(() => {
+      lastDismissedCaptionRef.current = captionText
+        ? { text: captionText, time: Date.now() }
+        : null
       setCaptionText('')
       resetWebTranscript()
     }, appConfig.recognition.captionHoldMs)
@@ -636,7 +661,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         const text = data.matches?.[0]?.trim()
 
         if (text) {
-          setCaptionText(text)
+          applyCaptionText(text)
           lastNativePartialRef.current = text
           resetSilenceTimer()
         }
@@ -715,7 +740,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         const text = getLiveCaption(interimTranscript, finalTranscript)
 
         if (text) {
-          setCaptionText(text)
+          applyCaptionText(text)
           resetSilenceTimer()
         }
 
@@ -755,6 +780,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   async function startCaptions() {
     try {
       captionEnabledRef.current = true
+      lastDismissedCaptionRef.current = null
       setCaptionText('')
 
       const didStart = isNativeApp
