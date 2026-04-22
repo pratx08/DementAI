@@ -100,6 +100,31 @@ export function mergeImportantSummaries(existing: string, incoming: string) {
   return normalizeSummary(deduped.join(' '))
 }
 
+export function choosePrioritySummary(existing: string, incoming: string) {
+  if (isPlaceholderSummary(existing)) {
+    return normalizeSummary(incoming)
+  }
+
+  if (isPlaceholderSummary(incoming)) {
+    return normalizeSummary(existing)
+  }
+
+  const existingIsImportant = hasHighValueContent(existing)
+  const incomingIsImportant = hasHighValueContent(incoming)
+  const existingScore = importanceScore(existing)
+  const incomingScore = importanceScore(incoming)
+
+  if (existingIsImportant && incomingIsImportant) {
+    return mergeImportantSummaries(existing, incoming)
+  }
+
+  if (incomingIsImportant && (!existingIsImportant || incomingScore > existingScore)) {
+    return normalizeSummary(incoming)
+  }
+
+  return normalizeSummary(existing)
+}
+
 function fallbackSummary(transcript: string) {
   const sentences = transcript
     .replace(/\s+/g, ' ')

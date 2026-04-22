@@ -39,10 +39,8 @@ import {
   type UnknownQueueItem,
 } from './services/dashboardData'
 import {
-  hasHighValueContent,
-  importanceScore,
+  choosePrioritySummary,
   isPlaceholderSummary,
-  mergeImportantSummaries,
   summarizeConversation,
 } from './services/summary'
 import { fetchStoredSummary, persistSummary } from './services/mongoService'
@@ -368,7 +366,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     // Person changed — reset all speech state
     speechTranscriptRef.current = ''
     lastNativePartialRef.current = ''
-    setLiveFaceSummary(null)
+    setLiveFaceSummary(recognized?.lastConversationSummary ?? null)
     if (silenceTimerRef.current) {
       window.clearTimeout(silenceTimerRef.current)
       silenceTimerRef.current = null
@@ -383,10 +381,17 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       if (!stored) return
       // Only apply if this person is still on screen
       if (recognizedRef.current?.id !== personId) return
-      computedSummariesRef.current.set(personId, stored)
-      setLiveFaceSummary(stored)
+      const currentSummary =
+        computedSummariesRef.current.get(personId) ??
+        recognizedRef.current?.lastConversationSummary ??
+        ''
+      const resolvedSummary = choosePrioritySummary(currentSummary, stored)
+      computedSummariesRef.current.set(personId, resolvedSummary)
+      setLiveFaceSummary(resolvedSummary)
       setRecognized((current) =>
-        current?.id === personId ? { ...current, lastConversationSummary: stored } : current,
+        current?.id === personId
+          ? { ...current, lastConversationSummary: resolvedSummary }
+          : current,
       )
     })
   }, [recognized])
@@ -480,6 +485,14 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         const [people] = await Promise.all([loadKnownPeople(), loadFaceModels()])
 
         if (isMounted) {
+          people.forEach((person) => {
+            if (!isPlaceholderSummary(person.lastConversationSummary)) {
+              computedSummariesRef.current.set(
+                person.id,
+                person.lastConversationSummary,
+              )
+            }
+          })
           setKnownPeople(people)
         }
       } catch {
@@ -564,18 +577,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       if (isBlank) {
         finalSummary = newSummary
       } else {
-        const newScore = importanceScore(newSummary)
-        const oldScore = importanceScore(existing)
-        const newIsImportant = hasHighValueContent(newSummary)
-        const oldIsImportant = hasHighValueContent(existing)
-
-        if (newIsImportant && oldIsImportant) {
-          finalSummary = mergeImportantSummaries(existing, newSummary)
-        } else if (newIsImportant && (!oldIsImportant || newScore > oldScore)) {
-          finalSummary = newSummary
-        } else {
-          finalSummary = existing
-        }
+        finalSummary = choosePrioritySummary(existing, newSummary)
       }
 
       // Immediately record the decision so the next run sees the right value
