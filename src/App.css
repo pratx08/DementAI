@@ -1959,3 +1959,202 @@ body {
   color: rgba(247, 255, 249, 0.48);
   line-height: 1.45;
 }
+
+/* ─── Competitor mini-cards (inside Market card) ────────────── */
+
+.cc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: clamp(14px, 3.5vw, 20px);
+}
+
+.cc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 12px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 2px solid var(--cc-accent, #fff);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.18s;
+}
+
+.cc-card:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cc-card-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #f7fff9;
+  line-height: 1.2;
+}
+
+.cc-card-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  opacity: 0.85;
+}
+
+.cc-arrow {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  color: rgba(247, 255, 249, 0.3);
+}
+
+/* ─── Company detail view ───────────────────────────────────── */
+
+.cd-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #0d0d0d;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 28px;
+  padding: clamp(18px, 4.5vw, 28px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Top bar */
+.cd-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.cd-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: rgba(247, 255, 249, 0.55);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cd-back svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.cd-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.cd-source:active { opacity: 0.65; }
+
+.cd-source-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Company name row */
+.cd-name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.cd-company-name {
+  font-size: clamp(1.1rem, 4vw, 1.4rem);
+  font-weight: 800;
+  color: #f7fff9;
+  line-height: 1.1;
+}
+
+.cd-company-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+/* Media blocks */
+.cd-media-block {
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  aspect-ratio: 16 / 9;
+}
+
+.cd-image,
+.cd-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 13px;
+}
+
+/* Placeholder shown when file is missing */
+.cd-image-placeholder,
+.cd-video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(247, 255, 249, 0.2);
+  text-align: center;
+  padding: 16px;
+}
+
+.cd-image-placeholder svg,
+.cd-video-placeholder svg {
+  width: 36px;
+  height: 36px;
+  opacity: 0.4;
+}
+
+.cd-image-placeholder span,
+.cd-video-placeholder span {
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: rgba(247, 255, 249, 0.3);
+}
+
+.cd-image-placeholder code,
+.cd-video-placeholder code {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 0.62rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
