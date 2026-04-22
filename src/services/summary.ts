@@ -3,6 +3,29 @@ type SummaryResult = {
   generated_text?: string
 }
 
+const STOP_WORDS = new Set([
+  'i', 'the', 'a', 'an', 'and', 'or', 'but', 'is', 'was', 'are', 'were',
+  'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+  'could', 'should', 'may', 'might', 'can', 'to', 'of', 'in', 'for', 'on',
+  'with', 'at', 'by', 'from', 'this', 'that', 'it', 'its', 'we', 'you',
+  'he', 'she', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your',
+  'his', 'our', 'their', 'not', 'no', 'so', 'if', 'as', 'up', 'out',
+  'about', 'what', 'which', 'who', 'when', 'where', 'how', 'all', 'any',
+  'just', 'more', 'also', 'then', 'than', 'into', 'over', 'after',
+])
+
+export function importanceScore(text: string): number {
+  if (!text.trim()) return 0
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+  const uniqueWords = new Set(words).size
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0).length
+  return uniqueWords * 3 + sentences * 2
+}
+
 let summarizerPromise: Promise<
   ((input: string, options?: Record<string, unknown>) => Promise<SummaryResult[]>) | null
 > | null = null

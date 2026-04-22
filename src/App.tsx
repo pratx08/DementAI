@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core'
 import { SpeechRecognition as NativeSpeechRecognition } from '@capgo/capacitor-speech-recognition'
 import WebSpeechRecognition, {
@@ -38,7 +38,7 @@ import {
   type SosAlert,
   type UnknownQueueItem,
 } from './services/dashboardData'
-import { summarizeConversation } from './services/summary'
+import { importanceScore, summarizeConversation } from './services/summary'
 import type { CSSProperties, FormEvent } from 'react'
 import type { FaceBox } from './services/mediaPipeFaceDetection'
 
@@ -306,9 +306,15 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const nativeListeningStateRef = useRef<PluginListenerHandle | null>(null)
   const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
   const browserRestartTimerRef = useRef<number | null>(null)
+  const recognizedRef = useRef<KnownPersonProfile | null>(null)
+  const speechTranscriptRef = useRef('')
+  const lastNativePartialRef = useRef('')
+  const silenceTimerRef = useRef<number | null>(null)
+  const isSummarizingFaceRef = useRef(false)
   const [captionText, setCaptionText] = useState('')
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
+  const [liveFaceSummary, setLiveFaceSummary] = useState<string | null>(null)
   const destination = useMemo(
     () => ({
       label: appConfig.map.destinationLabel,
@@ -342,6 +348,21 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     faceAnchorRef.current = faceAnchor
   }, [faceAnchor])
+
+  useEffect(() => {
+    const prev = recognizedRef.current
+    recognizedRef.current = recognized
+
+    if (prev?.id !== recognized?.id) {
+      speechTranscriptRef.current = ''
+      lastNativePartialRef.current = ''
+      setLiveFaceSummary(null)
+      if (silenceTimerRef.current) {
+        window.clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
+    }
+  }, [recognized])
 
   useEffect(() => {
     if (!showMap) {
@@ -489,6 +510,72 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     [],
   )
 
+  const handleFaceSpeechStopped = useCallback(async () => {
+    if (isSummarizingFaceRef.current) return
+    const person = recognizedRef.current
+    const transcript = speechTranscriptRef.current.trim()
+    if (!person || transcript.length < 15) return
+
+    speechTranscriptRef.current = ''
+    isSummarizingFaceRef.current = true
+
+    try {
+      const newSummary = await summarizeConversation(transcript)
+      const existing = person.lastConversationSummary ?? ''
+      const isBlank =
+        !existing || existing === 'Conversation summary will appear here after the next visit.'
+
+      let finalSummary: string
+
+      if (isBlank) {
+        finalSummary = newSummary
+      } else {
+        const newScore = importanceScore(newSummary)
+        const oldScore = importanceScore(existing)
+        const maxScore = Math.max(newScore, oldScore)
+        const ratio = maxScore === 0 ? 1 : Math.min(newScore, oldScore) / maxScore
+
+        if (ratio >= 0.75) {
+          // Similar importance — merge both
+          finalSummary = await summarizeConversation(`${existing} ${newSummary}`)
+        } else if (newScore > oldScore) {
+          finalSummary = newSummary
+        } else {
+          // Existing is more important — keep it
+          finalSummary = existing
+        }
+      }
+
+      setLiveFaceSummary(finalSummary)
+      setRecognized((current) =>
+        current?.id === person.id
+          ? { ...current, lastConversationSummary: finalSummary }
+          : current,
+      )
+      setKnownPeople((current) => {
+        const nextPeople = current.map((p) =>
+          p.id === person.id
+            ? { ...p, lastConversationSummary: finalSummary, lastVisitAt: new Date().toISOString() }
+            : p,
+        )
+        saveKnownPeople(nextPeople)
+        return nextPeople
+      })
+    } finally {
+      isSummarizingFaceRef.current = false
+    }
+  }, [])
+
+  const resetSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current) {
+      window.clearTimeout(silenceTimerRef.current)
+    }
+    silenceTimerRef.current = window.setTimeout(() => {
+      silenceTimerRef.current = null
+      handleFaceSpeechStopped()
+    }, 3500)
+  }, [handleFaceSpeechStopped])
+
   async function startNativeCaptions() {
     const availability = await NativeSpeechRecognition.available()
 
@@ -527,6 +614,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
         if (text) {
           setCaptionText(text)
+          lastNativePartialRef.current = text
+          resetSilenceTimer()
         }
       },
     )
@@ -538,6 +627,15 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
         if (!stopped || !captionEnabledRef.current) {
           return
+        }
+
+        // Commit the last partial result as a completed utterance
+        const utterance = lastNativePartialRef.current.trim()
+        if (utterance) {
+          speechTranscriptRef.current = speechTranscriptRef.current
+            ? `${speechTranscriptRef.current} ${utterance}`
+            : utterance
+          lastNativePartialRef.current = ''
         }
 
         window.setTimeout(() => {
@@ -595,6 +693,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
         if (text) {
           setCaptionText(text)
+          resetSilenceTimer()
+        }
+
+        if (finalTranscript.trim()) {
+          speechTranscriptRef.current = speechTranscriptRef.current
+            ? `${speechTranscriptRef.current} ${finalTranscript.trim()}`
+            : finalTranscript.trim()
         }
       }
       recognition.onerror = () => {
@@ -651,6 +756,11 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     captionEnabledRef.current = false
     setMicEnabled(false)
     setMicStatus('')
+
+    if (silenceTimerRef.current) {
+      window.clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
 
     if (isNativeApp) {
       await NativeSpeechRecognition.stop().catch(() => undefined)
@@ -896,7 +1006,11 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
               <p>{recognized.relation}</p>
               <h1>{recognized.name}</h1>
             </header>
-            <p>{recognized.lastConversationSummary}</p>
+            <p>
+              {micEnabled && captionText
+                ? captionText
+                : (liveFaceSummary ?? recognized.lastConversationSummary)}
+            </p>
           </aside>
         )}
 
