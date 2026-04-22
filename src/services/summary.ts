@@ -38,7 +38,14 @@ export function hasHighValueContent(text: string): boolean {
 }
 
 export function isPlaceholderSummary(text: string): boolean {
-  return !text.trim() || text === 'Conversation summary will appear here after the next visit.'
+  const normalized = text.replace(/\s+/g, ' ').trim().toLowerCase()
+
+  return (
+    !normalized ||
+    normalized === 'conversation summary will appear here after the next visit.' ||
+    normalized === 'no conversation summary yet. add one after the next visit.' ||
+    normalized.startsWith('no conversation summary yet')
+  )
 }
 
 export function importanceScore(text: string): number {
@@ -78,6 +85,8 @@ function normalizeSummary(text: string) {
 function splitSummaryParts(text: string) {
   return text
     .split(/(?<=[.!?])\s+/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter((part) => !isPlaceholderSummary(part))
     .map((part) => normalizeSummary(part).trim())
     .filter(Boolean)
 }
@@ -97,7 +106,7 @@ export function mergeImportantSummaries(existing: string, incoming: string) {
     return true
   })
 
-  return normalizeSummary(deduped.join(' '))
+  return normalizeSummary(deduped.slice(0, 2).join(' '))
 }
 
 export function choosePrioritySummary(existing: string, incoming: string) {

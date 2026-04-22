@@ -1046,11 +1046,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
               <p>{recognized.relation}</p>
               <h1>{recognized.name}</h1>
             </header>
-            <p>
-              {micEnabled && captionText
-                ? captionText
-                : (liveFaceSummary ?? recognized.lastConversationSummary)}
-            </p>
+            <p>{liveFaceSummary ?? recognized.lastConversationSummary}</p>
           </aside>
         )}
 
