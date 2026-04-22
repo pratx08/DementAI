@@ -1161,7 +1161,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         await loadFaceModels()
         const loadedPeople = await loadKnownPeople()
         setPeople(loadedPeople)
-        setDashboard(loadDashboardState(loadedPeople))
+        setDashboard(await loadDashboardState(loadedPeople))
         setSelectedContactId(loadedPeople[0]?.id ?? '')
         setVisitorPersonId(loadedPeople[0]?.id ?? '')
         didLoadRef.current = true

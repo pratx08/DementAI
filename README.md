@@ -9,10 +9,40 @@ Minimal React prototype for an AR-style assistive camera interface. The current 
 - Right-side SOS, flag person, and home controls.
 - A translucent OpenStreetMap home overlay that can later be replaced with native Capacitor maps.
 - Local `@vladmandic/human` model files under `public/human-models` for in-browser face recognition and identification.
+- Optional Node + MongoDB backend for shared contacts, summaries, SOS items, and caretaker state.
+
+## Backend Setup
+
+MongoDB is no longer accessed directly from the browser. To use the live database-backed app, create a `.env` file in the repo root:
+
+```env
+MONGODB_URI=mongodb+srv://pratx:YOUR_URL_ENCODED_PASSWORD@cluster0.w7d9eu0.mongodb.net/?appName=Cluster0
+MONGODB_DB_NAME=dementai
+PORT=4000
+```
+
+Then run:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+This starts a small Express API and serves the built frontend from the same process.
+
+For local frontend development against the API:
+
+```bash
+npm run dev:server
+npm run dev
+```
+
+Vite proxies `/api/*` requests to `http://localhost:4000`.
 
 ## Face Data Shape
 
-Enrolled people are stored in browser `localStorage` after the caretaker adds face samples. The fallback seed data is read from `public/data/knownFaces.json`. Each person uses this shape:
+Enrolled people are cached in browser `localStorage` for fast startup and synced to MongoDB when the backend is configured. Each person uses this shape:
 
 ```json
 {

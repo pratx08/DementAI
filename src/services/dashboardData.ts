@@ -1,5 +1,6 @@
 import { appConfig } from '../config/appConfig'
 import type { KnownPersonProfile } from './faceRecognition'
+import { apiGet, apiPut } from './apiClient'
 
 export type LogEntryType = 'encounter' | 'sos' | 'reminder' | 'note'
 
@@ -101,7 +102,7 @@ function createEmptyState(): DashboardState {
   }
 }
 
-export function loadDashboardState(_people: KnownPersonProfile[]) {
+function getStoredDashboardStateSync() {
   const stored = localStorage.getItem(appConfig.recognition.dashboardStorageKey)
 
   if (stored) {
@@ -109,8 +110,29 @@ export function loadDashboardState(_people: KnownPersonProfile[]) {
   }
 
   const empty = createEmptyState()
-  saveDashboardState(empty)
+  localStorage.setItem(
+    appConfig.recognition.dashboardStorageKey,
+    JSON.stringify(empty),
+  )
   return empty
+}
+
+export async function loadDashboardState(_people: KnownPersonProfile[]) {
+  try {
+    const data = await apiGet<{ dashboard: DashboardState | null }>('/dashboard')
+
+    if (data.dashboard) {
+      localStorage.setItem(
+        appConfig.recognition.dashboardStorageKey,
+        JSON.stringify(data.dashboard),
+      )
+      return data.dashboard
+    }
+  } catch {
+    // Fall back to local storage below.
+  }
+
+  return getStoredDashboardStateSync()
 }
 
 export function saveDashboardState(state: DashboardState) {
@@ -118,12 +140,14 @@ export function saveDashboardState(state: DashboardState) {
     appConfig.recognition.dashboardStorageKey,
     JSON.stringify(state),
   )
+
+  apiPut('/dashboard', { dashboard: state }).catch(() => undefined)
 }
 
 export function updateStoredDashboardState(
   updater: (current: DashboardState) => DashboardState,
 ) {
-  const current = loadDashboardState([])
+  const current = getStoredDashboardStateSync()
   const next = updater(current)
   saveDashboardState(next)
   return next

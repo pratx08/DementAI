@@ -1,6 +1,7 @@
 import Human from '@vladmandic/human'
 import type { Config, Input } from '@vladmandic/human'
 import { appConfig } from '../config/appConfig'
+import { apiDelete, apiGet, apiPut } from './apiClient'
 
 export const knownPeopleUpdatedEvent = 'dementai-known-people-updated'
 
@@ -118,10 +119,20 @@ export async function loadFaceModels() {
 }
 
 export async function loadKnownPeople(): Promise<KnownPersonProfile[]> {
-  const storedPeople = localStorage.getItem(appConfig.recognition.peopleStorageKey)
+  try {
+    const data = await apiGet<{ people: KnownPersonProfile[] }>('/people')
+    const people = Array.isArray(data.people) ? data.people : []
+    localStorage.setItem(
+      appConfig.recognition.peopleStorageKey,
+      JSON.stringify(people),
+    )
+    return people
+  } catch {
+    const storedPeople = localStorage.getItem(appConfig.recognition.peopleStorageKey)
 
-  if (storedPeople) {
-    return JSON.parse(storedPeople)
+    if (storedPeople) {
+      return JSON.parse(storedPeople)
+    }
   }
 
   return []
@@ -133,11 +144,14 @@ export function saveKnownPeople(people: KnownPersonProfile[]) {
     JSON.stringify(people),
   )
 
+  apiPut('/people', { people }).catch(() => undefined)
   window.dispatchEvent(new CustomEvent(knownPeopleUpdatedEvent))
 }
 
 export function clearKnownPeople() {
-  saveKnownPeople([])
+  localStorage.removeItem(appConfig.recognition.peopleStorageKey)
+  apiDelete('/people').catch(() => undefined)
+  window.dispatchEvent(new CustomEvent(knownPeopleUpdatedEvent))
 }
 
 async function createDescriptorFromInput(input: Input) {
