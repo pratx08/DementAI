@@ -1186,7 +1186,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   // Initialize synchronously from localStorage so there is never a blank
   // loading screen — the API sync happens in the background.
   const [dashboard, setDashboard] = useState<DashboardState>(getLocalDashboardState)
-  const [status, setStatus] = useState('Ready.')
+  const [status, setStatus] = useState('')
   const [activeTab, setActiveTab] = useState<CaretakerTab>('contacts')
   const [filter, setFilter] = useState('All')
   const [imageFiles, setImageFiles] = useState<File[]>([])
@@ -2517,7 +2517,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         </section>
       </section>
 
-      <p className="form-status caretaker-status">{status}</p>
+      {status && <p className="form-status caretaker-status">{status}</p>}
     </main>
   )
 }

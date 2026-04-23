@@ -200,25 +200,53 @@ function createEmptyState(): DashboardState {
   }
 }
 
+const SEED_IDS = {
+  cognitiveObservations: ['obs-seed-1', 'obs-seed-2', 'obs-seed-3', 'obs-seed-4', 'obs-seed-5'],
+  sosAlerts: ['sos-seed-1', 'sos-seed-2'],
+  unknownQueue: ['uq-seed-1', 'uq-seed-2'],
+}
+
 function getStoredDashboardStateSync() {
   const stored = localStorage.getItem(appConfig.recognition.dashboardStorageKey)
+  const seed = createEmptyState()
 
   if (stored) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsed: any = JSON.parse(stored)
+
     // Back-fill homeAddress if upgrading from an older stored state
     if (parsed.safeZone && !('homeAddress' in parsed.safeZone)) {
       parsed.safeZone.homeAddress = ''
     }
-    return parsed as DashboardState
+
+    // Inject seed items that are missing (existing users get demo data too)
+    const state = parsed as DashboardState
+
+    const hasSeedObs = state.cognitiveObservations.some((o) => SEED_IDS.cognitiveObservations.includes(o.id))
+    if (!hasSeedObs) {
+      state.cognitiveObservations = [...seed.cognitiveObservations, ...state.cognitiveObservations]
+    }
+
+    const hasSeedSos = state.sosAlerts.some((a) => SEED_IDS.sosAlerts.includes(a.id))
+    if (!hasSeedSos) {
+      state.sosAlerts = [...seed.sosAlerts, ...state.sosAlerts]
+    }
+
+    const hasSeedQueue = state.unknownQueue.some((q) => SEED_IDS.unknownQueue.includes(q.id))
+    if (!hasSeedQueue) {
+      state.unknownQueue = [...seed.unknownQueue, ...state.unknownQueue]
+    }
+
+    // Persist the merged result so subsequent loads are fast
+    localStorage.setItem(appConfig.recognition.dashboardStorageKey, JSON.stringify(state))
+    return state
   }
 
-  const empty = createEmptyState()
   localStorage.setItem(
     appConfig.recognition.dashboardStorageKey,
-    JSON.stringify(empty),
+    JSON.stringify(seed),
   )
-  return empty
+  return seed
 }
 
 /** Synchronous read from localStorage — safe to call as a useState lazy initializer. */
