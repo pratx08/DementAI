@@ -1543,6 +1543,428 @@ body {
   font-weight: 700;
 }
 
+/* ── Status badge ─────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.badge--low    { color: #1c6e3a; background: #d6f5e3; }
+.badge--medium { color: #7a4d08; background: #fef3d0; }
+.badge--high   { color: #8b1a1a; background: #fde8e8; }
+.badge--open   { color: #7a4d08; background: #fef3d0; }
+.badge--resolved { color: #1c6e3a; background: #d6f5e3; }
+.badge--pending  { color: #2d5068; background: #e4eef5; }
+.badge--follow-up { color: #5a3a00; background: #fff0cc; }
+.badge--dismissed { color: #5b6b77; background: #ecf0f2; }
+.badge--active   { color: #1c6e3a; background: #d6f5e3; }
+.badge--missed   { color: #8b1a1a; background: #fde8e8; }
+.badge--acknowledged { color: #2d5068; background: #e4eef5; }
+
+/* ── Contacts photo grid ──────────────────────────────── */
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.contact-grid-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border: 1px solid #dde7ef;
+  border-radius: 12px;
+  background: #f9fcfe;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.contact-grid-card:hover {
+  border-color: #8db5d3;
+  background: #eef6fc;
+}
+
+.contact-grid-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #d4e6f1;
+}
+
+.contact-grid-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #c8dde9;
+  color: #2a5570;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.contact-grid-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #163047;
+  line-height: 1.2;
+}
+
+.contact-grid-relation {
+  font-size: 0.74rem;
+  color: #5d7b92;
+}
+
+.contact-grid-count {
+  font-size: 0.72rem;
+  color: #8aabb9;
+}
+
+/* ── Modal overlay ────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(5, 15, 25, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.modal-box {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: min(90svh, 760px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #f4f9fc;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #dde7ef;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #163047;
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #5d7b92;
+  background: #e4eef5;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 22px;
+}
+
+.modal-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.modal-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #d4e6f1;
+  flex-shrink: 0;
+}
+
+.modal-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #c8dde9;
+  color: #2a5570;
+  font-size: 1.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.modal-avatar-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.modal-avatar-meta strong {
+  font-size: 1rem;
+  color: #163047;
+}
+
+.modal-avatar-meta span {
+  font-size: 0.84rem;
+  color: #5d7b92;
+}
+
+.modal-section-title {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid #dde7ef;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5d7b92;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #dde7ef;
+}
+
+.modal-delete {
+  margin-left: auto;
+  color: #8b1a1a !important;
+  background: #fde8e8 !important;
+  border-color: #f5c6c6 !important;
+}
+
+/* ── SOS detail expand ────────────────────────────────── */
+.sos-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #dde7ef;
+  border-radius: 10px;
+  background: #f9fcfe;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.sos-card:hover {
+  border-color: #b0c8d9;
+}
+
+.sos-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sos-card-body {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #e8eef3;
+}
+
+.sos-card-body p {
+  margin: 0;
+  color: #415e72;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.sos-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 0.8rem;
+  color: #5d7b92;
+}
+
+.sos-resolve-row {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+/* ── Reminder cards ───────────────────────────────────── */
+.reminder-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #dde7ef;
+  border-radius: 10px;
+  background: #f9fcfe;
+}
+
+.reminder-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reminder-card-header strong {
+  color: #163047;
+  font-size: 0.95rem;
+}
+
+.reminder-card-meta {
+  font-size: 0.8rem;
+  color: #5d7b92;
+}
+
+.reminder-card-msg {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #415e72;
+  line-height: 1.45;
+}
+
+/* ── Day-of-week picker ───────────────────────────────── */
+.dow-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dow-btn {
+  min-height: 34px !important;
+  min-width: 38px;
+  padding: 5px 8px !important;
+  font-size: 0.78rem !important;
+  border-radius: 999px !important;
+}
+
+.dow-btn.is-on {
+  border-color: #5b8def !important;
+  color: #fff !important;
+  background: #5b8def !important;
+}
+
+/* ── Cognitive report ─────────────────────────────────── */
+.obs-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-left: 3px solid transparent;
+  border-radius: 0 10px 10px 0;
+  background: #f9fcfe;
+}
+
+.obs-card--low    { border-left-color: #36b37e; }
+.obs-card--medium { border-left-color: #f0a500; }
+.obs-card--high   { border-left-color: #d9534f; }
+
+.obs-card strong { color: #163047; font-size: 0.95rem; }
+.obs-card p      { margin: 0; color: #415e72; font-size: 0.85rem; line-height: 1.45; }
+.obs-card-meta   { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.8rem; color: #5d7b92; }
+
+/* ── Safe zone ────────────────────────────────────────── */
+.radius-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #eef4f8;
+  font-size: 0.88rem;
+  color: #163047;
+}
+
+.radius-display strong {
+  font-size: 1.1rem;
+  color: #2d5e7e;
+}
+
+.trusted-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid #d0e3ef;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #2d5068;
+  background: #ecf5fb;
+}
+
+.trusted-pill button {
+  display: flex;
+  align-items: center;
+  padding: 0 !important;
+  min-height: unset !important;
+  border: none !important;
+  background: none !important;
+  color: #8aabb9;
+  cursor: pointer;
+}
+
+/* ── Reminder overlay in patient view ────────────────── */
+.reminder-overlay {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  z-index: 20;
+  width: min(340px, calc(100% - 28px));
+  padding: 18px 20px;
+  border: 1px solid rgba(230, 255, 238, 0.3);
+  border-radius: 14px;
+  background: rgba(5, 12, 9, 0.8);
+  backdrop-filter: blur(20px);
+  transform: translateX(-50%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.reminder-overlay h3 {
+  margin: 0 0 6px;
+  color: #95f2b6;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.reminder-overlay p {
+  margin: 0 0 14px;
+  color: rgba(248, 255, 250, 0.92);
+  font-size: 0.96rem;
+  line-height: 1.5;
+}
+
+.reminder-overlay button {
+  width: 100%;
+  min-height: 40px !important;
+  padding: 9px !important;
+  border-color: rgba(112, 245, 154, 0.4) !important;
+  color: #030d07 !important;
+  background: #95f2b6 !important;
+  font-size: 0.88rem !important;
+}
+
 .caretaker-status {
   max-width: 1360px;
   margin: 14px auto 0;

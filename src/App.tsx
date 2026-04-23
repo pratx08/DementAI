@@ -34,11 +34,9 @@ import {
   loadDashboardState,
   saveDashboardState,
   updateStoredDashboardState,
-  type CognitiveObservation,
   type DashboardState,
   type DailyLogEntry,
   type ReminderItem,
-  type SosAlert,
   type UnknownQueueItem,
 } from './services/dashboardData'
 import {
@@ -206,24 +204,6 @@ function formatShortDate(value: string) {
   }).format(new Date(value))
 }
 
-function getRelativeTime(value?: string) {
-  if (!value) {
-    return 'No recent visits'
-  }
-
-  const diff = Date.now() - new Date(value).getTime()
-  const days = Math.max(0, Math.floor(diff / (24 * 60 * 60 * 1000)))
-
-  if (days === 0) {
-    return 'Today'
-  }
-
-  if (days === 1) {
-    return '1 day ago'
-  }
-
-  return `${days} days ago`
-}
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -346,6 +326,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
   const [liveFaceSummary, setLiveFaceSummary] = useState<string | null>(null)
+  const [activeReminderOverlay, setActiveReminderOverlay] = useState<ReminderItem | null>(null)
   const destination = useMemo(
     () => ({
       label: appConfig.map.destinationLabel,
@@ -1046,6 +1027,26 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     setMicStatus('SOS sent to caretaker.')
   }
 
+  // Check for due reminders every 30 seconds and pop an overlay.
+  useEffect(() => {
+    function checkReminders() {
+      const stored = localStorage.getItem(appConfig.recognition.dashboardStorageKey)
+      if (!stored) return
+      const state = JSON.parse(stored) as { reminders?: ReminderItem[] }
+      const reminders = state.reminders ?? []
+      const now = Date.now()
+      const due = reminders.find((r) => {
+        if (r.status !== 'Active') return false
+        const fireAt = new Date(r.datetime).getTime()
+        return Math.abs(now - fireAt) < 30_000
+      })
+      if (due) setActiveReminderOverlay(due)
+    }
+
+    const interval = window.setInterval(checkReminders, 30_000)
+    return () => window.clearInterval(interval)
+  }, [])
+
   return (
     <main className="app-shell">
       <section
@@ -1078,6 +1079,19 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           <ArrowLeft size={17} />
           Login
         </button>
+
+        {activeReminderOverlay && (
+          <div className="reminder-overlay" role="alert" aria-live="assertive">
+            <h3>{activeReminderOverlay.category} reminder</h3>
+            <p>{activeReminderOverlay.message}</p>
+            <button
+              type="button"
+              onClick={() => setActiveReminderOverlay(null)}
+            >
+              Got it
+            </button>
+          </div>
+        )}
 
         {recognized && faceAnchor && (
           <aside
@@ -1192,7 +1206,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     useState<ReminderItem['category']>('Medication')
   const [reminderTitle, setReminderTitle] = useState('')
   const [reminderMessage, setReminderMessage] = useState('')
-  const [reminderSchedule, setReminderSchedule] = useState('')
   const [reminderPriority, setReminderPriority] =
     useState<ReminderItem['priority']>('Medium')
   const [visitorPersonId, setVisitorPersonId] = useState('')
@@ -1209,6 +1222,17 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const [extraImageFiles, setExtraImageFiles] = useState<File[]>([])
   const [extraImagePreviews, setExtraImagePreviews] = useState<string[]>([])
   const [isSavingPhotos, setIsSavingPhotos] = useState(false)
+  // Contacts modal
+  const [modalPersonId, setModalPersonId] = useState<string | null>(null)
+  // Reminder form
+  const [reminderDatetime, setReminderDatetime] = useState('')
+  const [reminderRecurring, setReminderRecurring] =
+    useState<ReminderItem['recurring']>('none')
+  const [reminderDays, setReminderDays] = useState<number[]>([])
+  // SOS expand
+  const [expandedSosId, setExpandedSosId] = useState<string | null>(null)
+  // Safe zone
+  const [homeAddressDraft, setHomeAddressDraft] = useState('')
 
   useEffect(() => {
     async function loadPeopleAndDashboard() {
@@ -1708,9 +1732,18 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   function handleAddReminder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!reminderTitle.trim() || !reminderMessage.trim() || !reminderSchedule.trim()) {
-      setStatus('Fill in the reminder title, schedule, and message first.')
+    if (!reminderTitle.trim() || !reminderMessage.trim() || !reminderDatetime) {
+      setStatus('Fill in the title, date/time, and message first.')
       return
+    }
+
+    const dt = new Date(reminderDatetime)
+    let label = dt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    if (reminderRecurring === 'daily') label += ' · Daily'
+    else if (reminderRecurring === 'weekdays') label += ' · Weekdays'
+    else if (reminderRecurring === 'weekly') {
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+      label += ` · Weekly (${reminderDays.map((d) => dayNames[d]).join(', ')})`
     }
 
     updateDashboard((current) => ({
@@ -1720,19 +1753,60 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
           id: createLocalId('reminder'),
           title: reminderTitle.trim(),
           category: selectedReminderCategory,
-          scheduleLabel: reminderSchedule.trim(),
+          scheduleLabel: label,
           message: reminderMessage.trim(),
           priority: reminderPriority,
-          status: 'On time',
+          datetime: dt.toISOString(),
+          recurring: reminderRecurring,
+          recurringDays: reminderRecurring === 'weekly' ? reminderDays : undefined,
+          status: 'Active',
         },
         ...current.reminders,
       ],
     }))
     setReminderTitle('')
     setReminderMessage('')
-    setReminderSchedule('')
+    setReminderDatetime('')
+    setReminderRecurring('none')
+    setReminderDays([])
     setReminderPriority('Medium')
-    setStatus('Reminder saved for the patient overlay schedule.')
+    setStatus('Reminder saved.')
+  }
+
+  function handleDeleteReminder(id: string) {
+    updateDashboard((current) => ({
+      ...current,
+      reminders: current.reminders.filter((r) => r.id !== id),
+    }))
+    setStatus('Reminder deleted.')
+  }
+
+  function handleSetHomeAddress() {
+    if (!homeAddressDraft.trim()) return
+    updateDashboard((current) => ({
+      ...current,
+      safeZone: { ...current.safeZone, homeAddress: homeAddressDraft.trim() },
+    }))
+    setHomeAddressDraft('')
+    setStatus('Home address saved.')
+  }
+
+  function handleRemoveTrustedLocation(location: string) {
+    updateDashboard((current) => ({
+      ...current,
+      safeZone: {
+        ...current.safeZone,
+        trustedLocations: current.safeZone.trustedLocations.filter((l) => l !== location),
+      },
+    }))
+  }
+
+  function handleDeletePerson(personId: string) {
+    const next = people.filter((p) => p.id !== personId)
+    setPeople(next)
+    saveKnownPeople(next)
+    setModalPersonId(null)
+    setStatus('Contact removed.')
   }
 
   function handleAddTrustedLocation() {
@@ -1802,6 +1876,8 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         </aside>
 
         <section className="tab-panel">
+
+          {/* ── Contacts ── */}
           {activeTab === 'contacts' && (
             <div className="dashboard-stack">
               <section className="dashboard-grid contacts-grid">
@@ -1896,12 +1972,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   </button>
                 </form>
 
+                {/* ── Contacts photo grid ── */}
                 <article className="panel-card">
-                  <div className="panel-head">
-                    <h2>Contacts</h2>
-                    <p>{people.length} people in the recognition database</p>
-                  </div>
-                  <div className="toolbar-row">
+                  <div className="toolbar-row" style={{ marginBottom: 12 }}>
                     <div className="filter-row" aria-label="Filter people">
                       {activeGroups.map((option) => (
                         <button
@@ -1915,139 +1988,36 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                       ))}
                     </div>
                     <button className="clear-faces" type="button" onClick={handleClearPeople}>
-                      Clear added faces
+                      Clear all
                     </button>
                   </div>
 
-                  <div className="contact-list">
-                    {visiblePeople.map((person) => (
-                      <button
-                        key={person.id}
-                        className={`person-row ${selectedContactId === person.id ? 'is-selected' : ''}`}
-                        type="button"
-                        onClick={() => setSelectedContactId(person.id)}
-                      >
-                        {person.imageDataUrl ? (
-                          <img src={person.imageDataUrl} alt="" />
-                        ) : (
-                          <div className="person-initial">{person.name.charAt(0)}</div>
-                        )}
-                        <div>
-                          <strong>{person.name}</strong>
-                          <span>
-                            {person.relation} · {person.group}
-                          </span>
-                          <p>{person.lastConversationSummary}</p>
-                        </div>
-                      </button>
-                    ))}
-                    {visiblePeople.length === 0 && (
-                      <p className="empty-people">No people in this group yet.</p>
-                    )}
-                  </div>
-
-                  {selectedContact && (
-                    <div className="detail-card">
-                      <div className="panel-head">
-                        <h2>{selectedContact.name}</h2>
-                        <p>
-                          Last visit {getRelativeTime(selectedContact.lastVisitAt)} ·{' '}
-                          {selectedContact.visitsThisMonth ?? 0} visits this month
-                        </p>
-                      </div>
-                      <div className="summary-workflow">
-                        <label>
-                          Visit transcript
-                          <textarea
-                            value={transcriptDraft}
-                            onChange={(event) => {
-                              setTranscriptDraft(event.target.value)
-                              transcriptDraftRef.current = event.target.value
-                            }}
-                            placeholder="Use the note mic and speak naturally."
-                          />
-                        </label>
-                        <div className="inline-actions">
-                          <button
-                            type="button"
-                            onClick={
-                              noteListening
-                                ? handleStopContactTranscript
-                                : handleStartContactTranscript
-                            }
-                          >
-                            {noteListening ? 'Stop and save' : 'Start note mic'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleGenerateSummary}
-                            disabled={isSummarizing}
-                          >
-                            {isSummarizing ? 'Summarizing...' : 'Generate summary'}
-                          </button>
-                        </div>
-                        <label>
-                          Memory card summary
-                          <textarea
-                            value={summaryDraft}
-                            onChange={(event) => setSummaryDraft(event.target.value)}
-                            placeholder="The latest summary shown on the patient card."
-                          />
-                        </label>
-                      </div>
-
-                      {/* ── Add more recognition photos ── */}
-                      <div className="extra-photos-section">
-                        <div className="panel-head">
-                          <h2>Add more photos</h2>
-                          <p>
-                            More face samples ({selectedContact.descriptors.length} stored) improve
-                            recognition accuracy. Capture or upload clear, front-facing shots.
-                          </p>
-                        </div>
-
-                        <div className="extra-photos-capture-row">
-                          <button type="button" onClick={handleExtraCapturePhoto}>
-                            Capture photo
-                          </button>
-                          <label className="extra-upload-label">
-                            Upload photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(event) => handleExtraImageChange(event.target.files?.[0] ?? null)}
-                            />
-                          </label>
-                        </div>
-
-                        {extraImagePreviews.length > 0 && (
-                          <div className="sample-strip" aria-label="Extra face samples">
-                            {extraImagePreviews.map((preview, index) => (
-                              <button
-                                key={`${preview}-${index}`}
-                                type="button"
-                                onClick={() => handleRemoveExtraSample(index)}
-                                aria-label={`Remove extra sample ${index + 1}`}
-                              >
-                                <img src={preview} alt="" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {extraImagePreviews.length > 0 && (
-                          <button
-                            type="button"
-                            className="save-person"
-                            onClick={handleSaveExtraPhotos}
-                            disabled={isSavingPhotos}
-                          >
-                            {isSavingPhotos
-                              ? 'Processing...'
-                              : `Save ${extraImagePreviews.length} photo${extraImagePreviews.length > 1 ? 's' : ''} to profile`}
-                          </button>
-                        )}
-                      </div>
+                  {visiblePeople.length === 0 ? (
+                    <p className="empty-people">No contacts in this group yet.</p>
+                  ) : (
+                    <div className="contact-grid">
+                      {visiblePeople.map((person) => (
+                        <button
+                          key={person.id}
+                          className="contact-grid-card"
+                          type="button"
+                          onClick={() => {
+                            setModalPersonId(person.id)
+                            setSelectedContactId(person.id)
+                            setExtraImageFiles([])
+                            setExtraImagePreviews([])
+                          }}
+                        >
+                          {person.imageDataUrl ? (
+                            <img className="contact-grid-img" src={person.imageDataUrl} alt="" />
+                          ) : (
+                            <div className="contact-grid-initial">{person.name.charAt(0)}</div>
+                          )}
+                          <span className="contact-grid-name">{person.name}</span>
+                          <span className="contact-grid-relation">{person.relation}</span>
+                          <span className="contact-grid-count">{person.descriptors.length} sample{person.descriptors.length !== 1 ? 's' : ''}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </article>
@@ -2055,35 +2025,126 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
+          {/* ── Contact profile modal ── */}
+          {modalPersonId && (() => {
+            const mp = people.find((p) => p.id === modalPersonId)
+            if (!mp) return null
+            return (
+              <div className="modal-backdrop" onClick={() => setModalPersonId(null)}>
+                <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <div className="modal-avatar-row">
+                      {mp.imageDataUrl ? (
+                        <img className="modal-avatar" src={mp.imageDataUrl} alt="" />
+                      ) : (
+                        <div className="modal-avatar-initial">{mp.name.charAt(0)}</div>
+                      )}
+                      <div className="modal-avatar-meta">
+                        <strong>{mp.name}</strong>
+                        <span>{mp.relation} · {mp.group}</span>
+                        <span>{mp.descriptors.length} recognition sample{mp.descriptors.length !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                    <button className="modal-close" type="button" onClick={() => setModalPersonId(null)} aria-label="Close">✕</button>
+                  </div>
+
+                  <div className="modal-body">
+                    <p className="modal-section-title">Conversation summary</p>
+                    <div className="summary-workflow">
+                      <label>
+                        Visit transcript
+                        <textarea
+                          value={transcriptDraft}
+                          onChange={(event) => {
+                            setTranscriptDraft(event.target.value)
+                            transcriptDraftRef.current = event.target.value
+                          }}
+                          placeholder="Speak or type notes from the latest visit."
+                        />
+                      </label>
+                      <div className="inline-actions">
+                        <button type="button" onClick={noteListening ? handleStopContactTranscript : handleStartContactTranscript}>
+                          {noteListening ? 'Stop and save' : 'Start note mic'}
+                        </button>
+                        <button type="button" onClick={handleGenerateSummary} disabled={isSummarizing}>
+                          {isSummarizing ? 'Summarizing…' : 'Generate summary'}
+                        </button>
+                      </div>
+                      <label>
+                        Memory card summary
+                        <textarea
+                          value={summaryDraft}
+                          onChange={(event) => setSummaryDraft(event.target.value)}
+                          placeholder="Shown on the patient face card."
+                        />
+                      </label>
+                    </div>
+
+                    <p className="modal-section-title">Add recognition photos</p>
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: '#5d7b92' }}>
+                      Capture front-facing shots in different lighting to improve accuracy.
+                    </p>
+                    <div className="extra-photos-capture-row">
+                      <button type="button" onClick={handleExtraCapturePhoto}>Capture photo</button>
+                      <label className="extra-upload-label">
+                        Upload photo
+                        <input type="file" accept="image/*" onChange={(event) => handleExtraImageChange(event.target.files?.[0] ?? null)} />
+                      </label>
+                    </div>
+                    {extraImagePreviews.length > 0 && (
+                      <div className="sample-strip">
+                        {extraImagePreviews.map((preview, index) => (
+                          <button key={`${preview}-${index}`} type="button" onClick={() => handleRemoveExtraSample(index)} aria-label={`Remove sample ${index + 1}`}>
+                            <img src={preview} alt="" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="modal-actions">
+                    {extraImagePreviews.length > 0 && (
+                      <button type="button" onClick={handleSaveExtraPhotos} disabled={isSavingPhotos}>
+                        {isSavingPhotos ? 'Processing…' : `Save ${extraImagePreviews.length} photo${extraImagePreviews.length > 1 ? 's' : ''}`}
+                      </button>
+                    )}
+                    <button type="button" className="modal-delete" onClick={() => handleDeletePerson(mp.id)}>
+                      Remove contact
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Daily Log ── */}
           {activeTab === 'daily-log' && (
             <div className="dashboard-grid">
               <article className="panel-card">
                 <div className="panel-head">
-                  <h2>Daily timeline</h2>
-                  <p>Filter and review the patient's day in chronological order.</p>
+                  <h2>Activity feed</h2>
+                  <p>Auto-logged face encounters, SOS events, reminders, and caretaker notes.</p>
                 </div>
-                <div className="filter-row">
+                <div className="filter-row" style={{ marginBottom: 8 }}>
                   {(['all', 'encounter', 'reminder', 'sos', 'note'] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={logFilter === option}
-                      onClick={() => setLogFilter(option)}
-                    >
+                    <button key={option} type="button" aria-pressed={logFilter === option} onClick={() => setLogFilter(option)}>
                       {option}
                     </button>
                   ))}
                 </div>
                 <div className="timeline-list">
                   {filteredDailyLog.length === 0 ? (
-                    <p className="empty-people">No log items yet.</p>
+                    <p className="empty-people">No activity logged yet. Face encounters and SOS events will appear here automatically.</p>
                   ) : (
                     filteredDailyLog.map((entry) => (
                       <div className="timeline-item" key={entry.id}>
-                        <strong>{entry.title}</strong>
-                        <span>{formatDateTime(entry.occurredAt)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <strong>{entry.title}</strong>
+                          <span className={`badge badge--${entry.type === 'sos' ? 'high' : entry.type === 'encounter' ? 'low' : 'pending'}`}>{entry.type}</span>
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(entry.occurredAt)}</span>
                         <p>{entry.summary}</p>
-                        {entry.sentiment && <small>Sentiment: {entry.sentiment}</small>}
+                        {entry.sentiment && <span className={`badge badge--${entry.sentiment === 'Positive' ? 'low' : entry.sentiment === 'Confused' ? 'medium' : 'pending'}`}>{entry.sentiment}</span>}
                       </div>
                     ))
                   )}
@@ -2093,34 +2154,21 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
               <form className="panel-card form-card" onSubmit={handleAddManualLog}>
                 <div className="panel-head">
                   <h2>Add caretaker note</h2>
-                  <p>Capture manual observations alongside the AI timeline.</p>
+                  <p>Record manual observations alongside the auto feed.</p>
                 </div>
-                <label>
-                  Title
-                  <input
-                    value={manualLogTitle}
-                    onChange={(event) => setManualLogTitle(event.target.value)}
-                    placeholder="Evening routine check"
-                  />
-                </label>
-                <label>
-                  Note
-                  <textarea
-                    value={manualLogSummary}
-                    onChange={(event) => setManualLogSummary(event.target.value)}
-                    placeholder="Patient ate dinner well and responded calmly to the medication reminder."
-                  />
-                </label>
-                <button type="submit">Save daily note</button>
+                <label>Title<input value={manualLogTitle} onChange={(e) => setManualLogTitle(e.target.value)} placeholder="Evening routine check" /></label>
+                <label>Note<textarea value={manualLogSummary} onChange={(e) => setManualLogSummary(e.target.value)} placeholder="Patient ate dinner well…" /></label>
+                <button type="submit">Save note</button>
               </form>
             </div>
           )}
 
+          {/* ── Unknown Queue ── */}
           {activeTab === 'unknown-queue' && (
             <article className="panel-card">
               <div className="panel-head">
-                <h2>Unknown queue</h2>
-                <p>Review flagged visitors and decide how to handle them.</p>
+                <h2>Unknown visitors</h2>
+                <p>Faces the patient flagged but couldn't identify. Review and take action.</p>
               </div>
               <div className="stack-list">
                 {dashboard.unknownQueue.length === 0 ? (
@@ -2128,39 +2176,18 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                 ) : (
                   dashboard.unknownQueue.map((item) => (
                     <div className="list-card" key={item.id}>
-                      <strong>{item.heardName}</strong>
-                      <span>
-                        {formatDateTime(item.flaggedAt)} · Emotion: {item.emotionalState}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <strong>{item.heardName}</strong>
+                        <span className={`badge badge--${item.status}`}>{item.status}</span>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(item.flaggedAt)} · Emotional state: {item.emotionalState}</span>
                       <p>{item.snippet}</p>
                       <div className="inline-actions">
-                        <button type="button" onClick={() => handleQueueToContact(item)}>
-                          Move to contact form
+                        <button type="button" onClick={() => handleQueueToContact(item)}>Add as contact</button>
+                        <button type="button" onClick={() => updateDashboard((cur) => ({ ...cur, unknownQueue: cur.unknownQueue.map((e) => e.id === item.id ? { ...e, status: 'follow-up' } : e) }))}>
+                          Follow-up
                         </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateDashboard((current) => ({
-                              ...current,
-                              unknownQueue: current.unknownQueue.map((entry) =>
-                                entry.id === item.id ? { ...entry, status: 'follow-up' } : entry,
-                              ),
-                            }))
-                          }
-                        >
-                          Flag for follow-up
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateDashboard((current) => ({
-                              ...current,
-                              unknownQueue: current.unknownQueue.map((entry) =>
-                                entry.id === item.id ? { ...entry, status: 'dismissed' } : entry,
-                              ),
-                            }))
-                          }
-                        >
+                        <button type="button" onClick={() => updateDashboard((cur) => ({ ...cur, unknownQueue: cur.unknownQueue.map((e) => e.id === item.id ? { ...e, status: 'dismissed' } : e) }))}>
                           Dismiss
                         </button>
                       </div>
@@ -2171,41 +2198,25 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </article>
           )}
 
+          {/* ── Visitor Schedule ── */}
           {activeTab === 'visitor-schedule' && (
             <div className="dashboard-grid">
               <form className="panel-card form-card" onSubmit={handleScheduleVisitor}>
                 <div className="panel-head">
-                  <h2>Schedule a visitor briefing</h2>
-                  <p>Prepare the patient with context before a visit begins.</p>
+                  <h2>Schedule a visit</h2>
+                  <p>Prepare the patient with context before a visitor arrives.</p>
                 </div>
                 <label>
                   Visitor
-                  <select
-                    value={visitorPersonId}
-                    onChange={(event) => setVisitorPersonId(event.target.value)}
-                  >
-                    {people.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
+                  <select value={visitorPersonId} onChange={(e) => setVisitorPersonId(e.target.value)}>
+                    {people.length === 0 && <option value="">— Add contacts first —</option>}
+                    {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </label>
-                <label>
-                  Visit date and time
-                  <input
-                    type="datetime-local"
-                    value={visitorDate}
-                    onChange={(event) => setVisitorDate(event.target.value)}
-                  />
-                </label>
+                <label>Date &amp; time<input type="datetime-local" value={visitorDate} onChange={(e) => setVisitorDate(e.target.value)} /></label>
                 <label>
                   Briefing context
-                  <textarea
-                    value={visitorContext}
-                    onChange={(event) => setVisitorContext(event.target.value)}
-                    placeholder="Sarah is visiting today. She has news about the Boston move and will bring photos."
-                  />
+                  <textarea value={visitorContext} onChange={(e) => setVisitorContext(e.target.value)} placeholder="Sarah is bringing photos from last summer. She has news about the move." />
                 </label>
                 <button type="submit">Schedule visit</button>
               </form>
@@ -2213,20 +2224,21 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
               <article className="panel-card">
                 <div className="panel-head">
                   <h2>Upcoming visits</h2>
-                  <p>Weekly visitor schedule with briefing history.</p>
+                  <p>{dashboard.visitorSchedule.length} visit{dashboard.visitorSchedule.length !== 1 ? 's' : ''} scheduled</p>
                 </div>
                 <div className="stack-list">
                   {dashboard.visitorSchedule.length === 0 ? (
-                    <p className="empty-people">No scheduled visits yet.</p>
+                    <p className="empty-people">No visits scheduled yet.</p>
                   ) : (
                     dashboard.visitorSchedule.map((visit) => {
-                      const person = people.find((item) => item.id === visit.personId)
+                      const person = people.find((p) => p.id === visit.personId)
                       return (
                         <div className="list-card" key={visit.id}>
-                          <strong>{person?.name ?? 'Unknown visitor'}</strong>
-                          <span>
-                            {formatDateTime(visit.visitDate)} · {visit.status}
-                          </span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                            <strong>{person?.name ?? 'Unknown visitor'}</strong>
+                            <span className={`badge badge--${visit.status === 'Scheduled' ? 'pending' : visit.status === 'Visited' ? 'low' : 'high'}`}>{visit.status}</span>
+                          </div>
+                          <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(visit.visitDate)}</span>
                           <p>{visit.context}</p>
                         </div>
                       )
@@ -2237,86 +2249,83 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
+          {/* ── Reminders ── */}
           {activeTab === 'reminders' && (
             <div className="dashboard-grid">
               <form className="panel-card form-card" onSubmit={handleAddReminder}>
                 <div className="panel-head">
                   <h2>Create reminder</h2>
-                  <p>Push a calm overlay directly into the patient view.</p>
+                  <p>Fires an overlay on the patient's camera screen at the set time.</p>
                 </div>
-                <label>
-                  Title
-                  <input
-                    value={reminderTitle}
-                    onChange={(event) => setReminderTitle(event.target.value)}
-                    placeholder="Blood pressure tablet"
-                  />
-                </label>
+                <label>Title<input value={reminderTitle} onChange={(e) => setReminderTitle(e.target.value)} placeholder="Blood pressure tablet" /></label>
                 <div className="form-grid">
                   <label>
                     Category
-                    <select
-                      value={selectedReminderCategory}
-                      onChange={(event) =>
-                        setSelectedReminderCategory(
-                          event.target.value as ReminderItem['category'],
-                        )
-                      }
-                    >
-                      {['Medication', 'Hydration', 'Exercise', 'Call', 'Other'].map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
+                    <select value={selectedReminderCategory} onChange={(e) => setSelectedReminderCategory(e.target.value as ReminderItem['category'])}>
+                      {['Medication', 'Hydration', 'Exercise', 'Call', 'Other'].map((o) => <option key={o}>{o}</option>)}
                     </select>
                   </label>
                   <label>
                     Priority
-                    <select
-                      value={reminderPriority}
-                      onChange={(event) =>
-                        setReminderPriority(event.target.value as ReminderItem['priority'])
-                      }
-                    >
-                      {['Low', 'Medium', 'High'].map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
+                    <select value={reminderPriority} onChange={(e) => setReminderPriority(e.target.value as ReminderItem['priority'])}>
+                      {['Low', 'Medium', 'High'].map((o) => <option key={o}>{o}</option>)}
                     </select>
                   </label>
                 </div>
+                <label>Date &amp; time<input type="datetime-local" value={reminderDatetime} onChange={(e) => setReminderDatetime(e.target.value)} /></label>
                 <label>
-                  Schedule
-                  <input
-                    value={reminderSchedule}
-                    onChange={(event) => setReminderSchedule(event.target.value)}
-                    placeholder="Daily, 8:00 PM"
-                  />
+                  Recurring
+                  <select value={reminderRecurring} onChange={(e) => setReminderRecurring(e.target.value as ReminderItem['recurring'])}>
+                    <option value="none">One-time</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays (Mon–Fri)</option>
+                    <option value="weekly">Weekly — pick days</option>
+                  </select>
                 </label>
+                {reminderRecurring === 'weekly' && (
+                  <div className="dow-picker">
+                    {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((day, i) => (
+                      <button
+                        key={day}
+                        type="button"
+                        className={`dow-btn ${reminderDays.includes(i) ? 'is-on' : ''}`}
+                        onClick={() => setReminderDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <label>
-                  Overlay message
-                  <textarea
-                    value={reminderMessage}
-                    onChange={(event) => setReminderMessage(event.target.value)}
-                    placeholder="Time for your tablet. It is in the kitchen cabinet, top shelf."
-                  />
+                  Message shown to patient
+                  <textarea value={reminderMessage} onChange={(e) => setReminderMessage(e.target.value)} placeholder="Time for your blood pressure tablet. It's in the kitchen cabinet, top shelf." />
                 </label>
                 <button type="submit">Save reminder</button>
               </form>
 
               <article className="panel-card">
                 <div className="panel-head">
-                  <h2>Reminder queue</h2>
-                  <p>Track what was acknowledged, delayed, or missed.</p>
+                  <h2>Saved reminders</h2>
+                  <p>{dashboard.reminders.length} reminder{dashboard.reminders.length !== 1 ? 's' : ''} scheduled</p>
                 </div>
                 <div className="stack-list">
                   {dashboard.reminders.length === 0 ? (
                     <p className="empty-people">No reminders yet.</p>
                   ) : (
-                    dashboard.reminders.map((reminder) => (
-                      <div className="list-card" key={reminder.id}>
-                        <strong>{reminder.title}</strong>
-                        <span>
-                          {reminder.category} · {reminder.scheduleLabel} · {reminder.status}
-                        </span>
-                        <p>{reminder.message}</p>
+                    dashboard.reminders.map((r) => (
+                      <div className="reminder-card" key={r.id}>
+                        <div className="reminder-card-header">
+                          <strong>{r.title}</strong>
+                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            <span className={`badge badge--${r.priority === 'High' ? 'high' : r.priority === 'Medium' ? 'medium' : 'low'}`}>{r.priority}</span>
+                            <span className={`badge badge--${r.status === 'Active' ? 'active' : r.status === 'Missed' ? 'missed' : 'acknowledged'}`}>{r.status}</span>
+                          </div>
+                        </div>
+                        <span className="reminder-card-meta">{r.category} · {r.scheduleLabel}</span>
+                        <p className="reminder-card-msg">{r.message}</p>
+                        <button type="button" style={{ marginTop: 4, alignSelf: 'start', color: '#8b1a1a', background: '#fde8e8', borderColor: '#f5c6c6', fontSize: '0.8rem', padding: '5px 10px', minHeight: 'unset' }} onClick={() => handleDeleteReminder(r.id)}>
+                          Delete
+                        </button>
                       </div>
                     ))
                   )}
@@ -2325,95 +2334,116 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
+          {/* ── Cognitive Report ── */}
           {activeTab === 'cognitive-report' && (
             <article className="panel-card">
+              <div className="panel-head">
+                <h2>Cognitive observations</h2>
+                <p>AI-detected and caretaker-recorded cognitive events. Share with the medical team at next review.</p>
+              </div>
               <div className="stack-list">
                 {dashboard.cognitiveObservations.length === 0 ? (
-                  <p className="empty-people">No cognitive items yet.</p>
+                  <p className="empty-people">No cognitive observations recorded yet.</p>
                 ) : (
-                  dashboard.cognitiveObservations.map(
-                    (observation: CognitiveObservation) => (
-                      <div className="list-card" key={observation.id}>
-                        <strong>{observation.title}</strong>
-                        <span>
-                          {formatShortDate(observation.date)} · {observation.source} ·{' '}
-                          {observation.severity}
-                        </span>
-                        <p>{observation.actionTaken}</p>
+                  dashboard.cognitiveObservations.map((obs) => (
+                    <div className={`obs-card obs-card--${obs.severity.toLowerCase()}`} key={obs.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <strong>{obs.title}</strong>
+                        <span className={`badge badge--${obs.severity === 'High' ? 'high' : obs.severity === 'Medium' ? 'medium' : 'low'}`}>{obs.severity}</span>
                       </div>
-                    ),
-                  )
+                      <div className="obs-card-meta">
+                        <span>{formatShortDate(obs.date)}</span>
+                        <span>Source: {obs.source}</span>
+                      </div>
+                      <p>{obs.actionTaken}</p>
+                    </div>
+                  ))
                 )}
               </div>
             </article>
           )}
 
+          {/* ── Safe Zone ── */}
           {activeTab === 'safe-zone' && (
             <div className="dashboard-grid">
               <article className="panel-card form-card">
                 <div className="panel-head">
-                  <h2>Safe zone</h2>
-                  <p>Set the default geofence and trusted destinations.</p>
+                  <h2>Safe zone settings</h2>
+                  <p>Define where the patient is allowed to be and add trusted destinations.</p>
                 </div>
+
                 <label>
-                  Radius: {dashboard.safeZone.radiusMeters} meters
+                  Home address
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={dashboard.safeZone.homeAddress || homeAddressDraft}
+                      readOnly={!!dashboard.safeZone.homeAddress}
+                      onChange={(e) => setHomeAddressDraft(e.target.value)}
+                      placeholder="950 Main St, Worcester, MA"
+                      style={{ flex: 1 }}
+                    />
+                    {!dashboard.safeZone.homeAddress && (
+                      <button type="button" onClick={handleSetHomeAddress} style={{ flexShrink: 0 }}>Set</button>
+                    )}
+                    {dashboard.safeZone.homeAddress && (
+                      <button type="button" style={{ flexShrink: 0 }} onClick={() => updateDashboard((c) => ({ ...c, safeZone: { ...c.safeZone, homeAddress: '' } }))}>Edit</button>
+                    )}
+                  </div>
+                </label>
+
+                <label>
+                  Safe radius
+                  <div className="radius-display">
+                    <span>Allowed area around home</span>
+                    <strong>{dashboard.safeZone.radiusMeters} m</strong>
+                  </div>
                   <input
-                    type="range"
-                    min="100"
-                    max="2000"
-                    step="50"
+                    type="range" min="100" max="2000" step="50"
                     value={dashboard.safeZone.radiusMeters}
-                    onChange={(event) =>
-                      updateDashboard((current) => ({
-                        ...current,
-                        safeZone: {
-                          ...current.safeZone,
-                          radiusMeters: Number(event.target.value),
-                        },
-                      }))
-                    }
+                    onChange={(e) => updateDashboard((c) => ({ ...c, safeZone: { ...c.safeZone, radiusMeters: Number(e.target.value) } }))}
                   />
+                  <span style={{ fontSize: '0.78rem', color: '#5d7b92' }}>100 m — 2 km</span>
                 </label>
+
                 <label>
-                  Trusted location
-                  <input
-                    value={trustedLocationDraft}
-                    onChange={(event) => setTrustedLocationDraft(event.target.value)}
-                    placeholder="Neighborhood park"
-                  />
+                  Add trusted location
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={trustedLocationDraft} onChange={(e) => setTrustedLocationDraft(e.target.value)} placeholder="Neighborhood park" style={{ flex: 1 }} />
+                    <button type="button" onClick={handleAddTrustedLocation} style={{ flexShrink: 0 }}>Add</button>
+                  </div>
                 </label>
-                <div className="inline-actions">
-                  <button type="button" onClick={handleAddTrustedLocation}>
-                    Add trusted location
-                  </button>
-                </div>
               </article>
 
               <article className="panel-card">
                 <div className="panel-head">
-                  <h2>Geofence history</h2>
-                  <p>Trusted places and recent exit events.</p>
+                  <h2>Trusted locations</h2>
+                  <p>Places the patient is expected to visit independently.</p>
                 </div>
-                <div className="detail-card">
-                  <label>Trusted locations</label>
+                {dashboard.safeZone.trustedLocations.length === 0 ? (
+                  <p className="empty-people">No trusted locations added yet.</p>
+                ) : (
                   <div className="pill-row">
-                    {dashboard.safeZone.trustedLocations.map((location) => (
-                      <span className="pill" key={location}>
-                        {location}
+                    {dashboard.safeZone.trustedLocations.map((loc) => (
+                      <span className="trusted-pill" key={loc}>
+                        {loc}
+                        <button type="button" onClick={() => handleRemoveTrustedLocation(loc)} aria-label={`Remove ${loc}`}>✕</button>
                       </span>
                     ))}
                   </div>
+                )}
+
+                <div className="panel-head" style={{ marginTop: 18 }}>
+                  <h2>Exit history</h2>
+                  <p>Recent times the patient left the safe zone.</p>
                 </div>
                 <div className="stack-list">
                   {dashboard.safeZone.exitHistory.length === 0 ? (
-                    <p className="empty-people">No exit history yet.</p>
+                    <p className="empty-people">No exit events recorded yet.</p>
                   ) : (
-                    dashboard.safeZone.exitHistory.map((event) => (
-                      <div className="list-card" key={event.id}>
-                        <strong>{event.location}</strong>
-                        <span>
-                          {formatDateTime(event.time)} · {event.durationMinutes} minutes
-                        </span>
+                    dashboard.safeZone.exitHistory.map((ev) => (
+                      <div className="list-card" key={ev.id}>
+                        <strong>{ev.location}</strong>
+                        <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(ev.time)} · {ev.durationMinutes} min outside</span>
                       </div>
                     ))
                   )}
@@ -2422,55 +2452,68 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
+          {/* ── SOS Alerts ── */}
           {activeTab === 'sos-alerts' && (
-            <div className="dashboard-grid">
-              <article className="panel-card">
-                <div className="panel-head">
-                  <h2>SOS alerts</h2>
-                  <p>Review distress events and document resolution steps.</p>
-                </div>
-                <div className="stack-list">
-                  {dashboard.sosAlerts.length === 0 ? (
-                    <p className="empty-people">No SOS alerts yet.</p>
-                  ) : (
-                    dashboard.sosAlerts.map((alert: SosAlert) => (
-                      <div className="list-card" key={alert.id}>
-                        <strong>{alert.id}</strong>
-                        <span>
-                          {formatDateTime(alert.time)} · {alert.trigger} · {alert.status}
-                        </span>
-                        <p>{alert.transcript}</p>
-                        <small>{alert.location}</small>
+            <article className="panel-card">
+              <div className="panel-head">
+                <h2>SOS alerts</h2>
+                <p>Click an alert to view details and resolve it.</p>
+              </div>
+              <div className="stack-list">
+                {dashboard.sosAlerts.length === 0 ? (
+                  <p className="empty-people">No SOS alerts yet.</p>
+                ) : (
+                  dashboard.sosAlerts.map((alert) => (
+                    <div
+                      className="sos-card"
+                      key={alert.id}
+                      onClick={() => setExpandedSosId(expandedSosId === alert.id ? null : alert.id)}
+                    >
+                      <div className="sos-card-header">
+                        <div>
+                          <strong style={{ display: 'block', marginBottom: 2 }}>{alert.trigger}</strong>
+                          <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(alert.time)}</span>
+                        </div>
+                        <span className={`badge badge--${alert.status === 'Open' ? 'open' : 'resolved'}`}>{alert.status}</span>
                       </div>
-                    ))
-                  )}
-                </div>
-              </article>
 
-              <article className="panel-card form-card">
-                <div className="panel-head">
-                  <h2>Resolve latest alert</h2>
-                  <p>Add a note and mark the most recent alert as handled.</p>
-                </div>
-                <label>
-                  Resolution note
-                  <textarea
-                    value={sosNoteDraft}
-                    onChange={(event) => setSosNoteDraft(event.target.value)}
-                    placeholder="Caretaker contacted the patient and confirmed they were back inside."
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    dashboard.sosAlerts[0] && handleResolveAlert(dashboard.sosAlerts[0].id)
-                  }
-                >
-                  Mark latest alert resolved
-                </button>
-              </article>
-            </div>
+                      {expandedSosId === alert.id && (
+                        <div className="sos-card-body">
+                          <div className="sos-card-meta">
+                            <span>📍 {alert.location}</span>
+                            {alert.latitude && <span>Lat {alert.latitude.toFixed(4)}, Lng {alert.longitude?.toFixed(4)}</span>}
+                          </div>
+                          <p>"{alert.transcript}"</p>
+                          {alert.note && <p style={{ fontStyle: 'italic' }}>Note: {alert.note}</p>}
+                          {alert.status === 'Open' && (
+                            <div className="sos-resolve-row">
+                              <textarea
+                                value={sosNoteDraft}
+                                onChange={(e) => setSosNoteDraft(e.target.value)}
+                                placeholder="Describe how this was resolved…"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleResolveAlert(alert.id)
+                                  setExpandedSosId(null)
+                                }}
+                              >
+                                Mark resolved
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </article>
           )}
+
         </section>
       </section>
 
