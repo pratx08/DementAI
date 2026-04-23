@@ -117,6 +117,11 @@ function getStoredDashboardStateSync() {
   return empty
 }
 
+/** Synchronous read from localStorage — safe to call as a useState lazy initializer. */
+export function getLocalDashboardState(): DashboardState {
+  return getStoredDashboardStateSync()
+}
+
 export async function loadDashboardState(_people: KnownPersonProfile[]) {
   try {
     const data = await apiGet<{ dashboard: DashboardState | null }>('/dashboard')

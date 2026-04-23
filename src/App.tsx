@@ -30,6 +30,7 @@ import {
   type KnownPersonProfile,
 } from './services/faceRecognition'
 import {
+  getLocalDashboardState,
   loadDashboardState,
   saveDashboardState,
   updateStoredDashboardState,
@@ -306,6 +307,7 @@ function LoginScreen({
 function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const {
     videoRef,
+    videoEl,
     cameraStatus,
     isCameraLive,
     isMirrored,
@@ -894,7 +896,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     async function trackFace() {
       const faceDetection = faceDetectionApiRef.current
-      const video = videoRef.current
+      const video = videoEl
       const frame = frameRef.current
 
       if (faceDetection && video && frame && video.readyState >= 2) {
@@ -923,13 +925,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         window.clearTimeout(trackingTimerRef.current)
       }
     }
-  }, [isMirrored, videoRef])
+  }, [isMirrored, videoEl])
 
   useEffect(() => {
     let isCancelled = false
 
     async function scan() {
-      const video = videoRef.current
+      const video = videoEl
 
       if (video && video.readyState >= 2 && faceAnchorRef.current) {
         try {
@@ -983,7 +985,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         window.clearTimeout(recognitionTimerRef.current)
       }
     }
-  }, [knownPeople, videoRef])
+  }, [knownPeople, videoEl])
 
   function handlePatientFlag() {
     const transcript = captionText.trim()
@@ -1164,10 +1166,12 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 }
 
 function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
-  const { videoRef: captureVideoRef, cameraStatus, isCameraLive, isMirrored } =
+  const { videoRef: captureVideoRef, videoEl: captureVideoEl, cameraStatus, isCameraLive, isMirrored } =
     useCamera('user')
   const [people, setPeople] = useState<KnownPersonProfile[]>([])
-  const [dashboard, setDashboard] = useState<DashboardState | null>(null)
+  // Initialize synchronously from localStorage so there is never a blank
+  // loading screen — the API sync happens in the background.
+  const [dashboard, setDashboard] = useState<DashboardState>(getLocalDashboardState)
   const [status, setStatus] = useState('Ready.')
   const [activeTab, setActiveTab] = useState<CaretakerTab>('contacts')
   const [filter, setFilter] = useState('All')
@@ -1202,11 +1206,15 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const autoSummarizeOnStopRef = useRef(false)
   const didLoadRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [extraImageFiles, setExtraImageFiles] = useState<File[]>([])
+  const [extraImagePreviews, setExtraImagePreviews] = useState<string[]>([])
+  const [isSavingPhotos, setIsSavingPhotos] = useState(false)
 
   useEffect(() => {
     async function loadPeopleAndDashboard() {
       try {
-        await loadFaceModels()
+        // Load face models in the background — don't block the dashboard.
+        loadFaceModels().catch(() => undefined)
         const loadedPeople = await loadKnownPeople()
         setPeople(loadedPeople)
         setDashboard(await loadDashboardState(loadedPeople))
@@ -1214,7 +1222,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         setVisitorPersonId(loadedPeople[0]?.id ?? '')
         didLoadRef.current = true
       } catch {
-        setStatus('Local face recognition models could not be loaded.')
+        // People/dashboard already initialized from localStorage — just flag sync failure.
+        setStatus('Could not sync with server. Showing locally saved data.')
+        didLoadRef.current = true
       }
     }
 
@@ -1230,7 +1240,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   }, [people])
 
   useEffect(() => {
-    if (!didLoadRef.current || !dashboard) {
+    if (!didLoadRef.current) {
       return
     }
 
@@ -1283,10 +1293,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   }, [selectedContact])
 
   const filteredDailyLog = useMemo(() => {
-    if (!dashboard) {
-      return []
-    }
-
     if (logFilter === 'all') {
       return dashboard.dailyLog
     }
@@ -1295,7 +1301,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   }, [dashboard, logFilter])
 
   function updateDashboard(updater: (current: DashboardState) => DashboardState) {
-    setDashboard((current) => (current ? updater(current) : current))
+    setDashboard((current) => updater(current))
   }
 
   function updatePerson(
@@ -1396,7 +1402,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   }
 
   async function handleCapturePhoto() {
-    const video = captureVideoRef.current
+    const video = captureVideoEl
 
     try {
       if (!video) {
@@ -1416,6 +1422,67 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setImagePreviews((current) =>
       current.filter((_, itemIndex) => itemIndex !== index),
     )
+  }
+
+  async function handleExtraImageChange(file: File | null) {
+    if (!file) return
+    const preview = await fileToDataUrl(file)
+    setExtraImageFiles((current) => [...current, file])
+    setExtraImagePreviews((current) => [...current, preview])
+  }
+
+  async function handleExtraCapturePhoto() {
+    const video = captureVideoEl
+    try {
+      if (!video) throw new Error('Camera is not ready yet.')
+      const file = await captureVideoFile(video, 'extra-face')
+      await handleExtraImageChange(file)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not capture photo.')
+    }
+  }
+
+  function handleRemoveExtraSample(index: number) {
+    setExtraImageFiles((current) => current.filter((_, i) => i !== index))
+    setExtraImagePreviews((current) => current.filter((_, i) => i !== index))
+  }
+
+  async function handleSaveExtraPhotos() {
+    if (!selectedContact || extraImageFiles.length === 0) {
+      setStatus('Select a contact and add at least one photo first.')
+      return
+    }
+
+    setIsSavingPhotos(true)
+    setStatus('Validating face samples...')
+
+    try {
+      const faceDetection = await import('./services/mediaPipeFaceDetection')
+      await faceDetection.loadMediaPipeImageFaceDetector()
+
+      for (const file of extraImageFiles) {
+        const face = await faceDetection.detectFaceInImage(file)
+        if (!face) throw new Error('Could not find a clear face in one of the photos.')
+      }
+
+      setStatus('Creating face descriptors...')
+      await loadFaceModels()
+      const newDescriptors = await Promise.all(
+        extraImageFiles.map((file) => createDescriptorFromImage(file)),
+      )
+
+      updatePerson(selectedContact.id, (person) => ({
+        ...person,
+        descriptors: [...person.descriptors, ...newDescriptors],
+      }))
+      setExtraImageFiles([])
+      setExtraImagePreviews([])
+      setStatus(`Added ${newDescriptors.length} photo${newDescriptors.length > 1 ? 's' : ''} to ${selectedContact.name}'s recognition profile.`)
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not process these photos.')
+    } finally {
+      setIsSavingPhotos(false)
+    }
   }
 
   async function handleClearPeople() {
@@ -1697,15 +1764,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setStatus('SOS alert marked as resolved.')
   }
 
-  if (!dashboard) {
-    return (
-      <main className="caretaker-shell">
-        <section className="loading-panel">
-          <strong>Loading...</strong>
-        </section>
-      </main>
-    )
-  }
 
   const tabs: { id: CaretakerTab; label: string }[] = [
     { id: 'contacts', label: 'Contacts' },
@@ -1936,6 +1994,59 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                             placeholder="The latest summary shown on the patient card."
                           />
                         </label>
+                      </div>
+
+                      {/* ── Add more recognition photos ── */}
+                      <div className="extra-photos-section">
+                        <div className="panel-head">
+                          <h2>Add more photos</h2>
+                          <p>
+                            More face samples ({selectedContact.descriptors.length} stored) improve
+                            recognition accuracy. Capture or upload clear, front-facing shots.
+                          </p>
+                        </div>
+
+                        <div className="extra-photos-capture-row">
+                          <button type="button" onClick={handleExtraCapturePhoto}>
+                            Capture photo
+                          </button>
+                          <label className="extra-upload-label">
+                            Upload photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => handleExtraImageChange(event.target.files?.[0] ?? null)}
+                            />
+                          </label>
+                        </div>
+
+                        {extraImagePreviews.length > 0 && (
+                          <div className="sample-strip" aria-label="Extra face samples">
+                            {extraImagePreviews.map((preview, index) => (
+                              <button
+                                key={`${preview}-${index}`}
+                                type="button"
+                                onClick={() => handleRemoveExtraSample(index)}
+                                aria-label={`Remove extra sample ${index + 1}`}
+                              >
+                                <img src={preview} alt="" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {extraImagePreviews.length > 0 && (
+                          <button
+                            type="button"
+                            className="save-person"
+                            onClick={handleSaveExtraPhotos}
+                            disabled={isSavingPhotos}
+                          >
+                            {isSavingPhotos
+                              ? 'Processing...'
+                              : `Save ${extraImagePreviews.length} photo${extraImagePreviews.length > 1 ? 's' : ''} to profile`}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
