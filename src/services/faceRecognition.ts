@@ -27,10 +27,6 @@ export type RecognitionResult = {
   similarity: number
 }
 
-type DescriptorMatch = {
-  person: KnownPersonProfile
-  descriptor: number[]
-}
 
 const humanConfig: Partial<Config> = {
   backend: 'webgl',
@@ -47,7 +43,8 @@ const humanConfig: Partial<Config> = {
     detector: {
       rotation: true,
       maxDetected: 1,
-      minConfidence: 0.45,
+      // Raised from 0.45 — only process clearly detected faces.
+      minConfidence: 0.62,
       minSize: 80,
       skipFrames: 0,
       skipTime: 0,
@@ -63,7 +60,8 @@ const humanConfig: Partial<Config> = {
     },
     description: {
       enabled: true,
-      minConfidence: 0.35,
+      // Raised from 0.35 — only generate embeddings for high-quality faces.
+      minConfidence: 0.50,
       skipFrames: 0,
       skipTime: 0,
     },
@@ -179,22 +177,12 @@ export async function createDescriptorFromImage(file: File) {
   return descriptor
 }
 
-function flattenDescriptors(people: KnownPersonProfile[]) {
-  return people.flatMap((person) =>
-    person.descriptors.map((descriptor) => ({
-      person,
-      descriptor,
-    })),
-  )
-}
 
 export async function identifyFace(
   video: HTMLVideoElement,
   people: KnownPersonProfile[],
 ): Promise<RecognitionResult | null> {
-  const knownDescriptors = flattenDescriptors(people)
-
-  if (knownDescriptors.length === 0) {
+  if (people.every((p) => p.descriptors.length === 0)) {
     return null
   }
 
@@ -205,21 +193,36 @@ export async function identifyFace(
   }
 
   const human = await getHuman()
-  const matches = knownDescriptors.map((item) => item.descriptor)
-  const bestMatch = human.match.find(descriptor, matches)
 
+  // Score each person by their best-matching descriptor separately.
+  // A flat global match lets one person's outlier descriptor "steal" a win
+  // from another person — per-person scoring prevents cross-person bleed.
+  const personScores = people.map((person) => {
+    if (person.descriptors.length === 0) return { person, similarity: 0, distance: 1 }
+    const match = human.match.find(descriptor, person.descriptors)
+    return { person, similarity: match.similarity, distance: match.distance }
+  })
+
+  personScores.sort((a, b) => b.similarity - a.similarity)
+
+  const best = personScores[0]
+  if (!best || best.similarity < appConfig.recognition.matchSimilarityThreshold) {
+    return null
+  }
+
+  // Require the winner to beat the runner-up by a meaningful margin.
+  // Without this, ambiguous faces that score 0.76 vs 0.74 get accepted.
+  const second = personScores[1]
   if (
-    bestMatch.index < 0 ||
-    bestMatch.similarity < appConfig.recognition.matchSimilarityThreshold
+    second &&
+    (best.similarity - second.similarity) < appConfig.recognition.matchGapThreshold
   ) {
     return null
   }
 
-  const match = knownDescriptors[bestMatch.index] as DescriptorMatch
-
   return {
-    profile: match.person,
-    distance: bestMatch.distance,
-    similarity: bestMatch.similarity,
+    profile: best.person,
+    distance: best.distance,
+    similarity: best.similarity,
   }
 }

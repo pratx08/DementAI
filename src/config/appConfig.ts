@@ -16,7 +16,15 @@ export const appConfig = {
     minTrackingIntervalMs: 120,
     speechPauseMs: 1800,
     captionHoldMs: 1000,
-    matchSimilarityThreshold: 0.5,
+    // Minimum cosine similarity to consider ANY match (Human.js range 0–1).
+    // 0.50 was too lenient and caused cross-person false positives.
+    matchSimilarityThreshold: 0.74,
+    // Best-person score must beat second-best by at least this margin.
+    // Prevents ambiguous matches from being accepted.
+    matchGapThreshold: 0.10,
+    // Same person must win this many consecutive scans before the card appears.
+    // Eliminates single-frame false positives.
+    temporalConsistencyFrames: 2,
   },
   mediaPipe: {
     wasmPath: assetPath('mediapipe/wasm'),

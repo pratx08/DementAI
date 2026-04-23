@@ -333,6 +333,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   // Tracks the most recently persisted summary per personId so the
   // comparison is never stale even before React state propagates.
   const computedSummariesRef = useRef<Map<string, string>>(new Map())
+  // Temporal consistency: same person must win N consecutive scans before
+  // the card is accepted, eliminating single-frame false positives.
+  const consecutiveMatchRef = useRef<{ id: string; count: number } | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
@@ -929,10 +932,28 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           const result = await identifyFace(video, knownPeople)
 
           if (!isCancelled) {
-            setRecognized(result?.profile ?? null)
+            if (result) {
+              const prev = consecutiveMatchRef.current
+              if (prev && prev.id === result.profile.id) {
+                consecutiveMatchRef.current = { id: prev.id, count: prev.count + 1 }
+              } else {
+                consecutiveMatchRef.current = { id: result.profile.id, count: 1 }
+              }
+
+              if (
+                consecutiveMatchRef.current.count >=
+                appConfig.recognition.temporalConsistencyFrames
+              ) {
+                setRecognized(result.profile)
+              }
+            } else {
+              consecutiveMatchRef.current = null
+              setRecognized(null)
+            }
           }
         } catch {
           if (!isCancelled) {
+            consecutiveMatchRef.current = null
             setRecognized(null)
           }
         }
