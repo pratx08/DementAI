@@ -169,7 +169,6 @@ function mapFaceBoxToFrame(
   const boxLeft = offsetX + box.x * scale
   const boxTop = offsetY + box.y * scale
   const boxWidth = box.width * scale
-  const boxHeight = box.height * scale
   const displayedLeft = isMirrored ? frameWidth - boxLeft - boxWidth : boxLeft
   const cardWidth = Math.min(280, Math.max(210, frameWidth * 0.3))
   const rightRailSpace = frameWidth <= 720 ? 86 : 18
@@ -179,10 +178,15 @@ function mapFaceBoxToFrame(
     frameWidth - cardWidth - rightRailSpace,
   )
 
-  return {
-    left,
-    top: Math.min(Math.max(boxTop + boxHeight * 0.16, 14), frameHeight - 120),
-  }
+  // Position the card so its bottom sits just above the top of the head box.
+  // 72 is a comfortable estimated card header height in pixels.
+  const estimatedCardHeight = 72
+  const top = Math.min(
+    Math.max(boxTop - estimatedCardHeight - 6, 10),
+    frameHeight - estimatedCardHeight - 10,
+  )
+
+  return { left, top }
 }
 
 function formatDateTime(value: string) {
