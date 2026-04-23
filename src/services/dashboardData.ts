@@ -206,47 +206,57 @@ const SEED_IDS = {
   unknownQueue: ['uq-seed-1', 'uq-seed-2'],
 }
 
+/**
+ * Merges seed demo items into any dashboard state (local or from API)
+ * so demo data always appears regardless of which source wins.
+ */
+function applySeeds(state: DashboardState): DashboardState {
+  const seed = createEmptyState()
+
+  // Back-fill homeAddress for states that pre-date the field
+  if (!('homeAddress' in state.safeZone)) {
+    (state.safeZone as SafeZoneSettings).homeAddress = ''
+  }
+
+  const hasSeedObs = state.cognitiveObservations.some((o) =>
+    SEED_IDS.cognitiveObservations.includes(o.id),
+  )
+  if (!hasSeedObs) {
+    state.cognitiveObservations = [
+      ...seed.cognitiveObservations,
+      ...state.cognitiveObservations,
+    ]
+  }
+
+  const hasSeedSos = state.sosAlerts.some((a) => SEED_IDS.sosAlerts.includes(a.id))
+  if (!hasSeedSos) {
+    state.sosAlerts = [...seed.sosAlerts, ...state.sosAlerts]
+  }
+
+  const hasSeedQueue = state.unknownQueue.some((q) =>
+    SEED_IDS.unknownQueue.includes(q.id),
+  )
+  if (!hasSeedQueue) {
+    state.unknownQueue = [...seed.unknownQueue, ...state.unknownQueue]
+  }
+
+  return state
+}
+
 function getStoredDashboardStateSync() {
   const stored = localStorage.getItem(appConfig.recognition.dashboardStorageKey)
-  const seed = createEmptyState()
 
   if (stored) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsed: any = JSON.parse(stored)
-
-    // Back-fill homeAddress if upgrading from an older stored state
-    if (parsed.safeZone && !('homeAddress' in parsed.safeZone)) {
-      parsed.safeZone.homeAddress = ''
-    }
-
-    // Inject seed items that are missing (existing users get demo data too)
-    const state = parsed as DashboardState
-
-    const hasSeedObs = state.cognitiveObservations.some((o) => SEED_IDS.cognitiveObservations.includes(o.id))
-    if (!hasSeedObs) {
-      state.cognitiveObservations = [...seed.cognitiveObservations, ...state.cognitiveObservations]
-    }
-
-    const hasSeedSos = state.sosAlerts.some((a) => SEED_IDS.sosAlerts.includes(a.id))
-    if (!hasSeedSos) {
-      state.sosAlerts = [...seed.sosAlerts, ...state.sosAlerts]
-    }
-
-    const hasSeedQueue = state.unknownQueue.some((q) => SEED_IDS.unknownQueue.includes(q.id))
-    if (!hasSeedQueue) {
-      state.unknownQueue = [...seed.unknownQueue, ...state.unknownQueue]
-    }
-
-    // Persist the merged result so subsequent loads are fast
+    const state = applySeeds(parsed as DashboardState)
     localStorage.setItem(appConfig.recognition.dashboardStorageKey, JSON.stringify(state))
     return state
   }
 
-  localStorage.setItem(
-    appConfig.recognition.dashboardStorageKey,
-    JSON.stringify(seed),
-  )
-  return seed
+  const fresh = createEmptyState()
+  localStorage.setItem(appConfig.recognition.dashboardStorageKey, JSON.stringify(fresh))
+  return fresh
 }
 
 /** Synchronous read from localStorage — safe to call as a useState lazy initializer. */
@@ -259,11 +269,16 @@ export async function loadDashboardState(_people: KnownPersonProfile[]) {
     const data = await apiGet<{ dashboard: DashboardState | null }>('/dashboard')
 
     if (data.dashboard) {
+      // Always apply seeds to the API response — otherwise old backend data
+      // overwrites the seed items that were already merged into localStorage.
+      const merged = applySeeds(data.dashboard)
       localStorage.setItem(
         appConfig.recognition.dashboardStorageKey,
-        JSON.stringify(data.dashboard),
+        JSON.stringify(merged),
       )
-      return data.dashboard
+      // Push the merged (seeded) version back to the API so it stays in sync
+      apiPut('/dashboard', { dashboard: merged }).catch(() => undefined)
+      return merged
     }
   } catch {
     // Fall back to local storage below.
