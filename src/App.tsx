@@ -2335,33 +2335,152 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
           )}
 
           {/* ── Cognitive Report ── */}
-          {activeTab === 'cognitive-report' && (
-            <article className="panel-card">
-              <div className="panel-head">
-                <h2>Cognitive observations</h2>
-                <p>AI-detected and caretaker-recorded cognitive events. Share with the medical team at next review.</p>
-              </div>
-              <div className="stack-list">
-                {dashboard.cognitiveObservations.length === 0 ? (
-                  <p className="empty-people">No cognitive observations recorded yet.</p>
-                ) : (
-                  dashboard.cognitiveObservations.map((obs) => (
-                    <div className={`obs-card obs-card--${obs.severity.toLowerCase()}`} key={obs.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <strong>{obs.title}</strong>
-                        <span className={`badge badge--${obs.severity === 'High' ? 'high' : obs.severity === 'Medium' ? 'medium' : 'low'}`}>{obs.severity}</span>
+          {activeTab === 'cognitive-report' && (() => {
+            const obs = dashboard.cognitiveObservations
+            const total = obs.length
+            const highCount = obs.filter((o) => o.severity === 'High').length
+            const medCount  = obs.filter((o) => o.severity === 'Medium').length
+            const lowCount  = obs.filter((o) => o.severity === 'Low').length
+            const aiCount   = obs.filter((o) => o.source === 'AI').length
+
+            // SVG donut chart — severity distribution
+            const r = 44
+            const circ = 2 * Math.PI * r
+            const segments = [
+              { label: 'High',   count: highCount, color: '#d9534f' },
+              { label: 'Medium', count: medCount,  color: '#f0a500' },
+              { label: 'Low',    count: lowCount,  color: '#36b37e' },
+            ]
+            let offset = 0
+            const donutSegments = segments.map((seg) => {
+              const dash = total > 0 ? (seg.count / total) * circ : 0
+              const gap  = circ - dash
+              const el = (
+                <circle
+                  key={seg.label}
+                  cx="52" cy="52" r={r}
+                  fill="none"
+                  stroke={seg.count > 0 ? seg.color : 'transparent'}
+                  strokeWidth="12"
+                  strokeDasharray={`${dash} ${gap}`}
+                  strokeDashoffset={-offset}
+                  strokeLinecap="butt"
+                />
+              )
+              offset += dash
+              return el
+            })
+
+            // 7-day trend bar chart
+            const days = Array.from({ length: 7 }, (_, i) => {
+              const d = new Date()
+              d.setDate(d.getDate() - (6 - i))
+              return d
+            })
+            const dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+            const dayCounts = days.map((d) =>
+              obs.filter((o) => {
+                const od = new Date(o.date)
+                return od.toDateString() === d.toDateString()
+              }).length,
+            )
+            const maxDay = Math.max(...dayCounts, 1)
+
+            return (
+              <div className="cog-report-layout">
+                {/* Stat cards */}
+                <div className="cog-stat-row">
+                  <div className="cog-stat">
+                    <span className="cog-stat-value">{total}</span>
+                    <span className="cog-stat-label">Total events</span>
+                  </div>
+                  <div className="cog-stat cog-stat--high">
+                    <span className="cog-stat-value">{highCount}</span>
+                    <span className="cog-stat-label">High severity</span>
+                  </div>
+                  <div className="cog-stat cog-stat--medium">
+                    <span className="cog-stat-value">{medCount}</span>
+                    <span className="cog-stat-label">Medium severity</span>
+                  </div>
+                  <div className="cog-stat">
+                    <span className="cog-stat-value">{aiCount}</span>
+                    <span className="cog-stat-label">AI detected</span>
+                  </div>
+                </div>
+
+                {/* Charts row */}
+                <div className="cog-charts-row">
+                  {/* Donut — severity split */}
+                  <article className="panel-card cog-chart-card">
+                    <p className="cog-chart-title">Severity distribution</p>
+                    <div className="cog-donut-wrap">
+                      <svg viewBox="0 0 104 104" className="cog-donut-svg" role="img" aria-label="Severity distribution donut chart">
+                        <circle cx="52" cy="52" r={r} fill="none" stroke="#edf2f5" strokeWidth="12" />
+                        {donutSegments}
+                        <text x="52" y="49" textAnchor="middle" className="cog-donut-num">{total}</text>
+                        <text x="52" y="62" textAnchor="middle" className="cog-donut-sub">events</text>
+                      </svg>
+                      <div className="cog-legend">
+                        {segments.map((s) => (
+                          <div key={s.label} className="cog-legend-row">
+                            <span className="cog-legend-dot" style={{ background: s.color }} />
+                            <span className="cog-legend-label">{s.label}</span>
+                            <span className="cog-legend-count">{s.count}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="obs-card-meta">
-                        <span>{formatShortDate(obs.date)}</span>
-                        <span>Source: {obs.source}</span>
-                      </div>
-                      <p>{obs.actionTaken}</p>
                     </div>
-                  ))
-                )}
+                  </article>
+
+                  {/* Bar chart — 7-day trend */}
+                  <article className="panel-card cog-chart-card">
+                    <p className="cog-chart-title">Last 7 days</p>
+                    <div className="cog-bar-chart">
+                      {dayCounts.map((count, i) => (
+                        <div key={i} className="cog-bar-col">
+                          <span className="cog-bar-count">{count > 0 ? count : ''}</span>
+                          <div className="cog-bar-track">
+                            <div
+                              className="cog-bar-fill"
+                              style={{ height: `${(count / maxDay) * 100}%` }}
+                            />
+                          </div>
+                          <span className="cog-bar-label">{dayLabels[days[i].getDay()]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                </div>
+
+                {/* Observation list */}
+                <article className="panel-card">
+                  <div className="panel-head">
+                    <h2>Observation log</h2>
+                    <p>Share with the medical team at next review.</p>
+                  </div>
+                  <div className="stack-list">
+                    {obs.length === 0 ? (
+                      <p className="empty-people">No cognitive observations recorded yet.</p>
+                    ) : (
+                      obs.map((o) => (
+                        <div className={`obs-card obs-card--${o.severity.toLowerCase()}`} key={o.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <strong>{o.title}</strong>
+                            <span className={`badge badge--${o.severity === 'High' ? 'high' : o.severity === 'Medium' ? 'medium' : 'low'}`}>{o.severity}</span>
+                          </div>
+                          <div className="obs-card-meta">
+                            <span>{formatShortDate(o.date)}</span>
+                            <span>Source: {o.source}</span>
+                          </div>
+                          <p>{o.actionTaken}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </article>
               </div>
-            </article>
-          )}
+            )
+          })()}
 
           {/* ── Safe Zone ── */}
           {activeTab === 'safe-zone' && (
