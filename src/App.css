@@ -2681,3 +2681,190 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
 }
+
+/* ── Cognitive Report Charts ─────────────────────────────────── */
+
+.cog-report-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cog-stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .cog-stat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.cog-stat {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cog-stat--high {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.07);
+}
+
+.cog-stat--medium {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.cog-stat-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #f7fff9;
+  line-height: 1;
+}
+
+.cog-stat-label {
+  font-size: 0.7rem;
+  color: rgba(247, 255, 249, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cog-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .cog-charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cog-chart-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cog-chart-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(247, 255, 249, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Donut chart */
+.cog-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.cog-donut-svg {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+
+.cog-donut-num {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #f7fff9;
+  line-height: 1;
+}
+
+.cog-donut-sub {
+  font-size: 0.65rem;
+  color: rgba(247, 255, 249, 0.4);
+  margin-top: 2px;
+}
+
+.cog-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.cog-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cog-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cog-legend-label {
+  font-size: 0.72rem;
+  color: rgba(247, 255, 249, 0.6);
+  flex: 1;
+}
+
+.cog-legend-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(247, 255, 249, 0.85);
+}
+
+/* Bar chart */
+.cog-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 90px;
+}
+
+.cog-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.cog-bar-track {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px 4px 0 0;
+  height: 70px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.cog-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.4s ease;
+  min-height: 0;
+}
+
+.cog-bar-label {
+  font-size: 0.6rem;
+  color: rgba(247, 255, 249, 0.35);
+  text-align: center;
+}
+
+.cog-bar-count {
+  font-size: 0.6rem;
+  color: rgba(247, 255, 249, 0.5);
+  font-weight: 600;
+}
