@@ -1077,7 +1077,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
         <button className="mode-back" type="button" onClick={onLogout}>
           <ArrowLeft size={17} />
-          Login
+          Back
         </button>
 
         {activeReminderOverlay && (
