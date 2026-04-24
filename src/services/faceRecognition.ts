@@ -50,7 +50,7 @@ const humanConfig: Partial<Config> = {
       skipTime: 0,
     },
     mesh: {
-      enabled: true,
+      enabled: false,
     },
     iris: {
       enabled: false,
