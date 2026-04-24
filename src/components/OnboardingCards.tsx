@@ -58,26 +58,26 @@ const CARDS: Card[] = [
   {
     accent: '#E8624A',
     eyebrow: 'The Problem',
-    stat: '55M+',
-    statLabel: 'people living with dementia worldwide — a new diagnosis every 3 seconds',
+    stat: '57M',
+    statLabel: 'people live with dementia worldwide',
     icon: (
       <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
         <path d="M24 8C15.16 8 8 15.16 8 24s7.16 16 16 16 16-7.16 16-16S32.84 8 24 8Z" stroke="currentColor" strokeWidth="2.2" />
         <path d="M24 16v10l6 4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
-    title: 'The crisis hiding in plain sight.',
-    body: "For a dementia patient, the cruelest symptom isn't forgetting a name — it's looking at their daughter's face and seeing a stranger. Current tools track location and dispense pills. Not one solves real-time face recognition. That is the gap DementAI was built to close.",
+    title: 'When memory breaks, connection breaks first.',
+    body: "Dementia care is not only about schedules. It is the moment someone looks at their own son or daughter and cannot place who they are. Most tools manage pills and calendars, but they do not protect the human connection happening face to face.",
     bullets: [
-      { label: '$1.3T', detail: 'annual global cost of dementia care (WHO, 2023)' },
-      { label: '70%', detail: 'of patients cannot consistently recognise close family within 5 years of diagnosis' },
+      { label: '11M+', detail: 'caregivers support people with dementia' },
+      { label: '47 hrs/week', detail: 'more than a full-time job for many families' },
     ],
   },
   {
     accent: '#5B8DEF',
     eyebrow: 'The Market',
-    stat: '$4.3B',
-    statLabel: 'global dementia care-tech market by 2027 · CAGR 8.1%',
+    stat: '$13B',
+    statLabel: 'projected dementia technology market by 2030',
     icon: (
       <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
         <rect x="6" y="28" width="8" height="14" rx="2" stroke="currentColor" strokeWidth="2.2" />
@@ -86,8 +86,12 @@ const CARDS: Card[] = [
         <path d="M10 22l10-8 10 6 10-12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
-    title: 'A massive market. A glaring blind spot.',
-    body: 'Tap a competitor below to see what they offer — and where DementAI goes further.',
+    title: 'The urgency is real, and the market is moving.',
+    body: 'Dementia already carries a $1.3 trillion global cost. New smart-glasses products are entering the space, but most focus on tasks, medication, and monitoring. DementAI focuses on the relationship between the patient and caregiver.',
+    bullets: [
+      { label: 'CrossSense', detail: 'AI glasses that guide patients through daily tasks' },
+      { label: 'CareYaya', detail: 'Smart glasses for recognition, medication, and care monitoring' },
+    ],
     showCompetitors: true,
   },
   {
