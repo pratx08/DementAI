@@ -40,7 +40,6 @@ import {
   type UnknownQueueItem,
 } from './services/dashboardData'
 import {
-  choosePrioritySummary,
   DEFAULT_SUMMARY,
   isPlaceholderSummary,
   summarizeConversation,
@@ -577,25 +576,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     isSummarizingFaceRef.current = true
 
     try {
-      const newSummary = await summarizeConversation(transcript)
-
-      // Use computedSummariesRef as the source of truth — it's always current
-      // even when React state hasn't propagated yet between renders.
+      const finalSummary = await summarizeConversation(transcript)
       const personId = person.id
-      const existing =
-        computedSummariesRef.current.get(personId) ??
-        ''
-      const isBlank = isPlaceholderSummary(existing)
-
-      let finalSummary: string
-
-      if (isBlank) {
-        finalSummary = newSummary
-      } else {
-        finalSummary = choosePrioritySummary(existing, newSummary)
-      }
-
-      // Immediately record the decision so the next run sees the right value
       computedSummariesRef.current.set(personId, finalSummary)
 
       setLiveFaceSummary(finalSummary)

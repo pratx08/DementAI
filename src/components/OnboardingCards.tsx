@@ -281,43 +281,48 @@ export function OnboardingCards({ onDone }: { onDone: () => void }) {
               exit="exit"
               transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
             >
-              {/* Eyebrow + step */}
-              <div className="ob-header-row">
-                <span className="ob-eyebrow" style={{ color: card.accent }}>{card.eyebrow}</span>
-                <span className="ob-step-count">{index + 1} / {CARDS.length}</span>
+              <div className="ob-card-grid">
+                <div className="ob-card-copy">
+                  <div className="ob-header-row">
+                    <span className="ob-eyebrow" style={{ color: card.accent }}>{card.eyebrow}</span>
+                    <span className="ob-step-count">{index + 1} / {CARDS.length}</span>
+                  </div>
+
+                  <div className="ob-divider" style={{ background: card.accent }} />
+                  <h2 className="ob-title">{card.title}</h2>
+                  <p className="ob-body">{card.body}</p>
+                </div>
+
+                <div className="ob-card-side">
+                  <div className="ob-side-top">
+                    <div className="ob-icon-panel" style={{ color: card.accent }}>
+                      {card.icon}
+                    </div>
+
+                    <div className="ob-stat-block">
+                      <span className="ob-stat-number" style={{ color: card.accent }}>{card.stat}</span>
+                      <span className="ob-stat-label">{card.statLabel}</span>
+                    </div>
+                  </div>
+
+                  {card.bullets && (
+                    <ul className="ob-bullets">
+                      {card.bullets.map((b) => (
+                        <li key={b.label} className="ob-bullet">
+                          <span className="ob-bullet-label" style={{ color: card.accent }}>{b.label}</span>
+                          <span className="ob-bullet-detail">{b.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {card.showCompetitors && (
+                    <CompetitorCards
+                      onSelect={(id) => setActiveCompany(COMPANIES.find((c) => c.id === id) ?? null)}
+                    />
+                  )}
+                </div>
               </div>
-
-              {/* Stat */}
-              <div className="ob-stat-block">
-                <span className="ob-stat-number" style={{ color: card.accent }}>{card.stat}</span>
-                <span className="ob-stat-label">{card.statLabel}</span>
-              </div>
-
-              {/* Divider */}
-              <div className="ob-divider" style={{ background: card.accent }} />
-
-              {/* Title + body */}
-              <h2 className="ob-title">{card.title}</h2>
-              <p className="ob-body">{card.body}</p>
-
-              {/* Bullet rows */}
-              {card.bullets && (
-                <ul className="ob-bullets">
-                  {card.bullets.map((b) => (
-                    <li key={b.label} className="ob-bullet">
-                      <span className="ob-bullet-label" style={{ color: card.accent }}>{b.label}</span>
-                      <span className="ob-bullet-detail">{b.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* Competitor cards (card 2 only) */}
-              {card.showCompetitors && (
-                <CompetitorCards
-                  onSelect={(id) => setActiveCompany(COMPANIES.find((c) => c.id === id) ?? null)}
-                />
-              )}
             </motion.div>
           )}
         </AnimatePresence>

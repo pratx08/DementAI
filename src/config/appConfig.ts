@@ -14,7 +14,7 @@ export const appConfig = {
     dashboardStorageKey: 'dementai-dashboard-state',
     minRecognitionIntervalMs: 2200,
     minTrackingIntervalMs: 120,
-    speechPauseMs: 1800,
+    speechPauseMs: 5000,
     captionHoldMs: 1000,
     // Minimum cosine similarity to consider ANY match (Human.js range 0–1).
     // 0.50 was too lenient and caused cross-person false positives.
