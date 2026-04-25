@@ -717,7 +717,8 @@ button {
 
 .action-rail .danger-action {
   color: #fffafa;
-  background: rgba(158, 32, 37, 0.78);
+  background: rgba(150, 49, 55, 0.58);
+  border-color: rgba(255, 190, 195, 0.34);
 }
 
 .action-rail span {

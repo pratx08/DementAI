@@ -8,16 +8,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   Flag,
-  Home,
   Mic,
   MicOff,
-  MapPin,
   Upload,
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
 import { LandingPage } from './components/LandingPage'
 import { OnboardingCards } from './components/OnboardingCards'
-import { DirectionsMap } from './components/DirectionsMap'
 import { useCamera } from './hooks/useCamera'
 import {
   clearKnownPeople,
@@ -294,10 +291,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const [recognized, setRecognized] = useState<KnownPersonProfile | null>(null)
   const [knownPeople, setKnownPeople] = useState<KnownPersonProfile[]>([])
   const [faceAnchor, setFaceAnchor] = useState<FaceAnchor | null>(null)
-  const [showMap, setShowMap] = useState(false)
-  const [currentLocation, setCurrentLocation] =
-    useState<GeolocationCoordinates | null>(null)
-  const [locationStatus, setLocationStatus] = useState('Waiting for location')
   const faceDetectionApiRef = useRef<FaceDetectionApi | null>(null)
   const frameRef = useRef<HTMLElement | null>(null)
   const faceAnchorRef = useRef<FaceAnchor | null>(null)
@@ -326,15 +319,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const [micStatus, setMicStatus] = useState('')
   const [liveFaceSummary, setLiveFaceSummary] = useState<string | null>(null)
   const [activeReminderOverlay, setActiveReminderOverlay] = useState<ReminderItem | null>(null)
-  const destination = useMemo(
-    () => ({
-      label: appConfig.map.destinationLabel,
-      address: appConfig.map.destinationAddress,
-      latitude: appConfig.map.latitude,
-      longitude: appConfig.map.longitude,
-    }),
-    [],
-  )
   const isNativeApp = Capacitor.isNativePlatform()
   const webSpeech = useSpeechRecognition()
   const webCaption = getLiveCaption(
@@ -415,33 +399,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       setLiveFaceSummary(resolvedSummary)
     })
   }, [recognized])
-
-  useEffect(() => {
-    if (!showMap) {
-      return
-    }
-
-    if (!navigator.geolocation) {
-      setLocationStatus('Location is not available')
-      return
-    }
-
-    setLocationStatus('Getting current location')
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCurrentLocation(position.coords)
-        setLocationStatus('Route starts from your current location')
-      },
-      () => {
-        setLocationStatus('Allow location for live directions')
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 15000,
-        timeout: 10000,
-      },
-    )
-  }, [showMap])
 
   useEffect(() => {
     if (!webCaption || isNativeApp) {
@@ -974,9 +931,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
   function handlePatientSos() {
     const transcript = captionText.trim()
-    const location = showMap
-      ? `${appConfig.map.destinationLabel}`
-      : 'Patient camera view'
+    const location = 'Patient camera view'
 
     updateStoredDashboardState((current) => ({
       ...current,
@@ -1094,23 +1049,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           </aside>
         )}
 
-        {showMap && (
-          <section className="map-layer" aria-label="Home navigation">
-            <DirectionsMap
-              origin={currentLocation}
-              destination={destination}
-              onStatusChange={setLocationStatus}
-            />
-            <div className="route-card">
-              <MapPin size={18} />
-              <div>
-                <strong>{appConfig.map.destinationLabel}</strong>
-                <span>{locationStatus}</span>
-              </div>
-            </div>
-          </section>
-        )}
-
         <nav className="action-rail" aria-label="Primary actions">
           <button
             className={`microphone-toggle ${micEnabled ? 'is-listening' : ''}`}
@@ -1133,15 +1071,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           <button type="button" aria-label="Flag person" onClick={handlePatientFlag}>
             <Flag size={22} />
             <span>Flag</span>
-          </button>
-          <button
-            type="button"
-            aria-label="Show route home"
-            aria-pressed={showMap}
-            onClick={() => setShowMap((current) => !current)}
-          >
-            <Home size={22} />
-            <span>Home</span>
           </button>
         </nav>
 
