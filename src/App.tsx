@@ -40,6 +40,7 @@ import {
   DEFAULT_SUMMARY,
   isPlaceholderSummary,
   summarizeConversation,
+  warmConversationSummarizer,
 } from './services/summary'
 import { fetchStoredSummary, persistSummary } from './services/mongoService'
 import type { CSSProperties, FormEvent } from 'react'
@@ -303,6 +304,14 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
   const browserRestartTimerRef = useRef<number | null>(null)
   const recognizedRef = useRef<KnownPersonProfile | null>(null)
+  const lastRecognizedPersonRef = useRef<{
+    person: KnownPersonProfile
+    recognizedAt: number
+  } | null>(null)
+  const conversationPersonRef = useRef<{
+    person: KnownPersonProfile
+    lockedAt: number
+  } | null>(null)
   const speechTranscriptRef = useRef('')
   const lastNativePartialRef = useRef('')
   const lastDismissedCaptionRef = useRef<{ text: string; time: number } | null>(null)
@@ -314,6 +323,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   // Temporal consistency: same person must win N consecutive scans before
   // the card is accepted, eliminating single-frame false positives.
   const consecutiveMatchRef = useRef<{ id: string; count: number } | null>(null)
+  const recognitionMissCountRef = useRef(0)
   const [captionText, setCaptionText] = useState('')
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
@@ -326,6 +336,29 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     webSpeech.finalTranscript || webSpeech.transcript,
   )
   const resetWebTranscript = webSpeech.resetTranscript
+
+  const lockConversationPerson = useCallback(() => {
+    if (conversationPersonRef.current) {
+      return conversationPersonRef.current.person
+    }
+
+    const currentPerson = recognizedRef.current
+    const recentPerson = lastRecognizedPersonRef.current
+    const fallbackPerson =
+      recentPerson && Date.now() - recentPerson.recognizedAt < 20000
+        ? recentPerson.person
+        : null
+    const target = currentPerson ?? fallbackPerson
+
+    if (target) {
+      conversationPersonRef.current = {
+        person: target,
+        lockedAt: Date.now(),
+      }
+    }
+
+    return target
+  }, [])
 
   const applyCaptionText = useCallback((text: string) => {
     const trimmed = text.trim()
@@ -371,16 +404,29 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     if (prev?.id === recognized?.id) return
 
-    // Person changed — reset all speech state
-    speechTranscriptRef.current = ''
-    lastNativePartialRef.current = ''
-    setLiveFaceSummary(recognized ? DEFAULT_SUMMARY : null)
-    if (silenceTimerRef.current) {
-      window.clearTimeout(silenceTimerRef.current)
-      silenceTimerRef.current = null
+    if (!recognized) {
+      return
     }
 
-    if (!recognized) return
+    lastRecognizedPersonRef.current = {
+      person: recognized,
+      recognizedAt: Date.now(),
+    }
+
+    if (!speechTranscriptRef.current.trim()) {
+      conversationPersonRef.current = null
+      lastNativePartialRef.current = ''
+      setLiveFaceSummary(DEFAULT_SUMMARY)
+      if (silenceTimerRef.current) {
+        window.clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
+    } else if (!conversationPersonRef.current) {
+      conversationPersonRef.current = {
+        person: recognized,
+        lockedAt: Date.now(),
+      }
+    }
 
     // Pull the persisted summary from MongoDB and show it right away.
     // Falls back silently to whatever is already in localStorage.
@@ -399,14 +445,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       setLiveFaceSummary(resolvedSummary)
     })
   }, [recognized])
-
-  useEffect(() => {
-    if (!webCaption || isNativeApp) {
-      return
-    }
-
-    setCaptionText(webCaption)
-  }, [isNativeApp, webCaption])
 
   useEffect(() => {
     if (!captionText) {
@@ -524,12 +562,19 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
   const handleFaceSpeechStopped = useCallback(async () => {
     if (isSummarizingFaceRef.current) return
-    const person = recognizedRef.current
+    const recentPerson = lastRecognizedPersonRef.current
+    const person =
+      conversationPersonRef.current?.person ??
+      recognizedRef.current ??
+      (recentPerson && Date.now() - recentPerson.recognizedAt < 20000
+        ? recentPerson.person
+        : null)
     const transcript = speechTranscriptRef.current.trim()
     if (!person || transcript.length < 15) return
 
     // Clear accumulator before the async work so new speech starts fresh
     speechTranscriptRef.current = ''
+    conversationPersonRef.current = null
     isSummarizingFaceRef.current = true
 
     try {
@@ -537,7 +582,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       const personId = person.id
       computedSummariesRef.current.set(personId, finalSummary)
 
-      setLiveFaceSummary(finalSummary)
+      if (recognizedRef.current?.id === personId || !recognizedRef.current) {
+        setLiveFaceSummary(finalSummary)
+      }
       setKnownPeople((current) => {
         const nextPeople = current.map((p) =>
           p.id === personId
@@ -556,6 +603,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   }, [])
 
   const resetSilenceTimer = useCallback(() => {
+    lockConversationPerson()
+
     if (silenceTimerRef.current) {
       window.clearTimeout(silenceTimerRef.current)
     }
@@ -563,7 +612,16 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       silenceTimerRef.current = null
       handleFaceSpeechStopped()
     }, appConfig.recognition.speechPauseMs)
-  }, [handleFaceSpeechStopped])
+  }, [handleFaceSpeechStopped, lockConversationPerson])
+
+  useEffect(() => {
+    if (!webCaption || isNativeApp) {
+      return
+    }
+
+    setCaptionText(webCaption)
+    resetSilenceTimer()
+  }, [isNativeApp, resetSilenceTimer, webCaption])
 
   async function startNativeCaptions() {
     const availability = await NativeSpeechRecognition.available()
@@ -733,6 +791,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         return
       }
 
+      warmConversationSummarizer()
       setMicEnabled(true)
       setMicStatus('')
     } catch {
@@ -751,6 +810,8 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       window.clearTimeout(silenceTimerRef.current)
       silenceTimerRef.current = null
     }
+
+    await handleFaceSpeechStopped()
 
     if (isNativeApp) {
       await NativeSpeechRecognition.stop().catch(() => undefined)
@@ -859,6 +920,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
           if (!isCancelled) {
             if (result) {
+              recognitionMissCountRef.current = 0
               const prev = consecutiveMatchRef.current
               if (prev && prev.id === result.profile.id) {
                 consecutiveMatchRef.current = { id: prev.id, count: prev.count + 1 }
@@ -874,18 +936,27 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
               }
             } else {
               consecutiveMatchRef.current = null
-              setRecognized(null)
+              recognitionMissCountRef.current += 1
+              if (recognitionMissCountRef.current >= 3) {
+                setRecognized(null)
+              }
             }
           }
         } catch {
           if (!isCancelled) {
             consecutiveMatchRef.current = null
-            setRecognized(null)
+            recognitionMissCountRef.current += 1
+            if (recognitionMissCountRef.current >= 3) {
+              setRecognized(null)
+            }
           }
         }
       } else {
         if (!isCancelled) {
-          setRecognized(null)
+          recognitionMissCountRef.current += 1
+          if (recognitionMissCountRef.current >= 3) {
+            setRecognized(null)
+          }
         }
       }
 

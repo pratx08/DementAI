@@ -12,8 +12,8 @@ export const appConfig = {
     knownFacesPath: assetPath('data/knownFaces.json'),
     peopleStorageKey: 'dementai-known-people',
     dashboardStorageKey: 'dementai-dashboard-state',
-    minRecognitionIntervalMs: 850,
-    minTrackingIntervalMs: 90,
+    minRecognitionIntervalMs: 650,
+    minTrackingIntervalMs: 70,
     speechPauseMs: 5000,
     captionHoldMs: 1000,
     // Minimum cosine similarity to consider ANY match (Human.js range 0–1).

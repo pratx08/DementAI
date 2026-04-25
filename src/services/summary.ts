@@ -82,6 +82,10 @@ async function getSummarizer() {
   return summarizerPromise
 }
 
+export function warmConversationSummarizer() {
+  void getSummarizer()
+}
+
 export async function summarizeConversation(transcript: string) {
   const cleanTranscript = transcript.replace(/\s+/g, ' ').trim()
 
