@@ -2174,14 +2174,21 @@ body {
   display: inline-block;
 }
 
+.landing-letter--suffix {
+  position: relative;
+  will-change: transform, color;
+}
+
 .landing-letter--ai {
   color: #36B37E;
+  text-shadow: 0 0 24px rgba(54, 179, 126, 0.28);
 }
 
 .landing-suffix-wrap {
   position: relative;
   display: inline-flex;
   min-width: 2ch;
+  perspective: 600px;
 }
 
 /* Tagline */
