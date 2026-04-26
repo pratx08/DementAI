@@ -15,7 +15,6 @@ const geminiApiKey =
   process.env.GOOGLE_API_KEY
 const geminiModel = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 const geminiSummaryModel = process.env.GEMINI_SUMMARY_MODEL || geminiModel
-const geminiSpeechModel = process.env.GEMINI_STT_MODEL || geminiModel
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const distPath = path.resolve(__dirname, '..', 'dist')
@@ -284,61 +283,6 @@ app.post('/api/summarize', async (req, res) => {
         error.status === 502
           ? 'Gemini summarization failed.'
           : error instanceof Error ? error.message : 'Could not summarize conversation.',
-      detail: error.status === 502 && error instanceof Error ? error.message : undefined,
-    })
-  }
-})
-
-app.post('/api/transcribe', async (req, res) => {
-  const audioBase64 =
-    typeof req.body?.audioBase64 === 'string' ? req.body.audioBase64.trim() : ''
-  const mimeType =
-    typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : ''
-
-  if (!audioBase64 || !mimeType) {
-    res.status(400).json({ error: 'Audio and MIME type are required.' })
-    return
-  }
-
-  const prompt = [
-    'Generate an accurate transcript of the speech in this audio.',
-    'Return only the spoken words as plain text.',
-    'Do not add commentary, labels, timestamps, markdown, or speaker names unless they were spoken.',
-  ].join('\n')
-
-  try {
-    const data = await generateGeminiContent(
-      geminiSpeechModel,
-      [
-        { text: prompt },
-        {
-          inlineData: {
-            mimeType,
-            data: audioBase64,
-          },
-        },
-      ],
-      {
-        temperature: 0,
-        maxOutputTokens: 1024,
-      },
-    )
-    const transcript = extractGeminiText(data)
-      .replace(/^transcript:\s*/i, '')
-      .trim()
-
-    if (!transcript) {
-      res.status(502).json({ error: 'Gemini returned an empty transcript.' })
-      return
-    }
-
-    res.json({ transcript })
-  } catch (error) {
-    res.status(error.status ?? 500).json({
-      error:
-        error.status === 502
-          ? 'Gemini transcription failed.'
-          : error instanceof Error ? error.message : 'Could not transcribe audio.',
       detail: error.status === 502 && error instanceof Error ? error.message : undefined,
     })
   }

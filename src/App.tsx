@@ -43,7 +43,6 @@ import {
   summarizeConversation,
   warmConversationSummarizer,
 } from './services/summary'
-import { transcribeAudio } from './services/transcription'
 import { fetchStoredSummary, persistSummary } from './services/mongoService'
 import type { CSSProperties, FormEvent } from 'react'
 import type { FaceBox } from './services/mediaPipeFaceDetection'
@@ -96,21 +95,6 @@ type CaretakerTab =
   | 'cognitive-report'
 
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
-const GEMINI_SPEECH_LEVEL_THRESHOLD = 0.01
-const GEMINI_SPEECH_CHECK_MS = 150
-
-function getPreferredAudioMimeType() {
-  if (!('MediaRecorder' in window)) {
-    return ''
-  }
-
-  return [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/ogg;codecs=opus',
-    'audio/mp4',
-  ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
-}
 
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -130,10 +114,6 @@ function getLiveCaption(interimTranscript: string, finalTranscript: string) {
 
 function getBrowserSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition
-}
-
-function getWordCount(text: string) {
-  return text.trim().split(/\s+/).filter(Boolean).length
 }
 
 async function requestMicPermission() {
@@ -326,15 +306,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
   const browserRestartTimerRef = useRef<number | null>(null)
   const browserPartialTranscriptRef = useRef('')
-  const geminiAudioStreamRef = useRef<MediaStream | null>(null)
-  const geminiMediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const geminiAudioChunksRef = useRef<Blob[]>([])
-  const geminiAudioContextRef = useRef<AudioContext | null>(null)
-  const geminiAnalyserRef = useRef<AnalyserNode | null>(null)
-  const geminiSilenceMonitorRef = useRef<number | null>(null)
-  const geminiHeardSpeechRef = useRef(false)
-  const geminiShouldProcessAudioRef = useRef(false)
-  const geminiLastSpeechAtRef = useRef(0)
+  const lastWebFinalTranscriptRef = useRef('')
   const recognizedRef = useRef<KnownPersonProfile | null>(null)
   const lastRecognizedPersonRef = useRef<{
     person: KnownPersonProfile
@@ -585,7 +557,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       if (browserRestartTimerRef.current) {
         window.clearTimeout(browserRestartTimerRef.current)
       }
-      stopGeminiAudioCapture(false)
       WebSpeechRecognition.stopListening()
       NativeSpeechRecognition.stop().catch(() => undefined)
       NativeSpeechRecognition.removeAllListeners().catch(() => undefined)
@@ -685,43 +656,24 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     setCaptionText(webCaption)
     resetSilenceTimer()
-  }, [isNativeApp, resetSilenceTimer, webCaption])
 
-  function cleanupGeminiAudio() {
-    if (geminiSilenceMonitorRef.current) {
-      window.clearInterval(geminiSilenceMonitorRef.current)
-      geminiSilenceMonitorRef.current = null
-    }
-
-    geminiAudioContextRef.current?.close().catch(() => undefined)
-    geminiAudioContextRef.current = null
-    geminiAnalyserRef.current = null
-    geminiAudioStreamRef.current?.getTracks().forEach((track) => track.stop())
-    geminiAudioStreamRef.current = null
-  }
-
-  function stopGeminiAudioCapture(processAudio: boolean) {
-    geminiShouldProcessAudioRef.current =
-      processAudio && geminiHeardSpeechRef.current
-
-    if (geminiSilenceMonitorRef.current) {
-      window.clearInterval(geminiSilenceMonitorRef.current)
-      geminiSilenceMonitorRef.current = null
-    }
-
-    const recorder = geminiMediaRecorderRef.current
-    if (recorder && recorder.state !== 'inactive') {
-      recorder.stop()
+    if (browserRecognitionRef.current) {
       return
     }
 
-    cleanupGeminiAudio()
-  }
+    const finalTranscript = webSpeech.finalTranscript.trim()
+    if (
+      finalTranscript &&
+      finalTranscript !== lastWebFinalTranscriptRef.current
+    ) {
+      speechTranscriptRef.current = speechTranscriptRef.current
+        ? `${speechTranscriptRef.current} ${finalTranscript}`
+        : finalTranscript
+      lastWebFinalTranscriptRef.current = finalTranscript
+    }
+  }, [isNativeApp, resetSilenceTimer, webCaption, webSpeech.finalTranscript])
 
-  function startBrowserLiveCaptions(
-    captureTranscript: boolean,
-    scheduleSummary: boolean,
-  ) {
+  function startBrowserLiveCaptions() {
     const BrowserSpeechRecognition = getBrowserSpeechRecognition()
 
     if (!BrowserSpeechRecognition) {
@@ -754,13 +706,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       if (text) {
         applyCaptionText(text)
         lockConversationPerson()
-        if (scheduleSummary) {
-          resetSilenceTimer()
-        }
-      }
-
-      if (!captureTranscript) {
-        return
+        resetSilenceTimer()
       }
 
       if (interimTranscript.trim()) {
@@ -775,11 +721,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       }
     }
     recognition.onerror = () => {
-      resetBrowserRecognition(captureTranscript)
-      if (captureTranscript) {
-        setMicEnabled(false)
-        setMicStatus('Tap mic to restart CC')
-      }
+      resetBrowserRecognition()
+      setMicEnabled(false)
+      setMicStatus('Tap mic to restart CC')
     }
     recognition.onend = () => {
       if (!captionEnabledRef.current || document.visibilityState !== 'visible') {
@@ -793,121 +737,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     browserRecognitionRef.current = recognition
     recognition.start()
 
-    return true
-  }
-
-  async function beginGeminiAudioCapture() {
-    const mimeType = getPreferredAudioMimeType()
-
-    if (!mimeType) {
-      return false
-    }
-
-    cleanupGeminiAudio()
-    geminiAudioChunksRef.current = []
-    geminiHeardSpeechRef.current = false
-    geminiShouldProcessAudioRef.current = false
-    geminiLastSpeechAtRef.current = 0
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const audioContext = new AudioContext()
-    const analyser = audioContext.createAnalyser()
-    const source = audioContext.createMediaStreamSource(stream)
-    const recorder = new MediaRecorder(stream, { mimeType })
-    const sampleBuffer = new Uint8Array(analyser.fftSize)
-
-    analyser.fftSize = 2048
-    source.connect(analyser)
-
-    geminiAudioStreamRef.current = stream
-    geminiAudioContextRef.current = audioContext
-    geminiAnalyserRef.current = analyser
-    geminiMediaRecorderRef.current = recorder
-
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        geminiAudioChunksRef.current.push(event.data)
-      }
-    }
-
-    recorder.onstop = () => {
-      const shouldProcess = geminiShouldProcessAudioRef.current
-      const chunks = geminiAudioChunksRef.current
-
-      geminiAudioChunksRef.current = []
-      geminiMediaRecorderRef.current = null
-      cleanupGeminiAudio()
-
-      if (!shouldProcess || chunks.length === 0) {
-        if (captionEnabledRef.current) {
-          void beginGeminiAudioCapture()
-        }
-        return
-      }
-
-      void (async () => {
-        try {
-          const blob = new Blob(chunks, { type: mimeType })
-          const transcript = await transcribeAudio(blob)
-
-          if (transcript) {
-            const existingTranscript = speechTranscriptRef.current.trim()
-            const livePartial = browserPartialTranscriptRef.current.trim()
-            const liveTranscript = [existingTranscript, livePartial]
-              .filter(Boolean)
-              .join(' ')
-              .trim()
-            const finalTranscript =
-              getWordCount(liveTranscript) > getWordCount(transcript)
-                ? liveTranscript
-                : transcript
-
-            speechTranscriptRef.current = finalTranscript
-            browserPartialTranscriptRef.current = ''
-            applyCaptionText(finalTranscript)
-            await handleFaceSpeechStopped()
-          }
-        } catch {
-          setMicStatus('Gemini transcription failed. Check the Render Gemini key.')
-        } finally {
-          if (captionEnabledRef.current) {
-            setMicStatus('')
-            void beginGeminiAudioCapture()
-          }
-        }
-      })()
-    }
-
-    geminiSilenceMonitorRef.current = window.setInterval(() => {
-      analyser.getByteTimeDomainData(sampleBuffer)
-      let sum = 0
-
-      for (const value of sampleBuffer) {
-        const normalized = (value - 128) / 128
-        sum += normalized * normalized
-      }
-
-      const level = Math.sqrt(sum / sampleBuffer.length)
-
-      if (level > GEMINI_SPEECH_LEVEL_THRESHOLD) {
-        geminiHeardSpeechRef.current = true
-        geminiLastSpeechAtRef.current = Date.now()
-        lockConversationPerson()
-        setMicStatus('')
-        return
-      }
-
-      if (
-        geminiHeardSpeechRef.current &&
-        Date.now() - geminiLastSpeechAtRef.current >=
-          appConfig.recognition.speechPauseMs
-      ) {
-        stopGeminiAudioCapture(true)
-      }
-    }, GEMINI_SPEECH_CHECK_MS)
-
-    recorder.start(500)
-    setMicStatus('')
     return true
   }
 
@@ -992,14 +821,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   }
 
   async function startWebCaptions() {
-    if ('MediaRecorder' in window && window.AudioContext) {
-      const didStartGeminiCapture = await beginGeminiAudioCapture()
-      if (didStartGeminiCapture) {
-        startBrowserLiveCaptions(true, false)
-      }
-      return didStartGeminiCapture
-    }
-
     const BrowserSpeechRecognition = getBrowserSpeechRecognition()
 
     if (!BrowserSpeechRecognition && !webSpeech.browserSupportsSpeechRecognition) {
@@ -1011,7 +832,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     await requestMicPermission()
 
     if (BrowserSpeechRecognition) {
-      return startBrowserLiveCaptions(true, true)
+      return startBrowserLiveCaptions()
     }
 
     await WebSpeechRecognition.startListening({
@@ -1057,13 +878,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       silenceTimerRef.current = null
     }
 
-    const isGeminiRecording = Boolean(geminiMediaRecorderRef.current)
-
-    if (isGeminiRecording) {
-      stopGeminiAudioCapture(true)
-    } else {
-      await handleFaceSpeechStopped()
-    }
+    await handleFaceSpeechStopped()
 
     if (isNativeApp) {
       await NativeSpeechRecognition.stop().catch(() => undefined)
@@ -1090,7 +905,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     if (
       isNativeApp ||
       browserRecognitionRef.current ||
-      geminiMediaRecorderRef.current ||
       !micEnabled ||
       webSpeech.listening ||
       !webSpeech.browserSupportsSpeechRecognition
