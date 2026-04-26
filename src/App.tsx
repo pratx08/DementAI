@@ -38,6 +38,7 @@ import {
 } from './services/dashboardData'
 import {
   DEFAULT_SUMMARY,
+  hasSummarizableContent,
   isPlaceholderSummary,
   summarizeConversation,
   warmConversationSummarizer,
@@ -303,6 +304,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const nativeListeningStateRef = useRef<PluginListenerHandle | null>(null)
   const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
   const browserRestartTimerRef = useRef<number | null>(null)
+  const browserPartialTranscriptRef = useRef('')
   const recognizedRef = useRef<KnownPersonProfile | null>(null)
   const lastRecognizedPersonRef = useRef<{
     person: KnownPersonProfile
@@ -562,6 +564,16 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
   const handleFaceSpeechStopped = useCallback(async () => {
     if (isSummarizingFaceRef.current) return
+    const browserPartial = browserPartialTranscriptRef.current.trim()
+
+    if (hasSummarizableContent(browserPartial)) {
+      speechTranscriptRef.current = speechTranscriptRef.current
+        ? `${speechTranscriptRef.current} ${browserPartial}`
+        : browserPartial
+    }
+
+    browserPartialTranscriptRef.current = ''
+
     const recentPerson = lastRecognizedPersonRef.current
     const person =
       conversationPersonRef.current?.person ??
@@ -570,7 +582,11 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         ? recentPerson.person
         : null)
     const transcript = speechTranscriptRef.current.trim()
-    if (!person || transcript.length < 15) return
+    if (!person || !hasSummarizableContent(transcript)) {
+      speechTranscriptRef.current = ''
+      conversationPersonRef.current = null
+      return
+    }
 
     // Clear accumulator before the async work so new speech starts fresh
     speechTranscriptRef.current = ''
@@ -579,6 +595,9 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
     try {
       const finalSummary = await summarizeConversation(transcript)
+      if (!finalSummary.trim()) {
+        return
+      }
       const personId = person.id
       computedSummariesRef.current.set(personId, finalSummary)
 
@@ -613,6 +632,18 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       handleFaceSpeechStopped()
     }, appConfig.recognition.speechPauseMs)
   }, [handleFaceSpeechStopped, lockConversationPerson])
+
+  const resetBrowserRecognition = useCallback(() => {
+    captionEnabledRef.current = false
+
+    if (browserRestartTimerRef.current) {
+      window.clearTimeout(browserRestartTimerRef.current)
+      browserRestartTimerRef.current = null
+    }
+
+    browserRecognitionRef.current?.stop()
+    browserRecognitionRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!webCaption || isNativeApp) {
@@ -743,13 +774,19 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           resetSilenceTimer()
         }
 
+        if (interimTranscript.trim()) {
+          browserPartialTranscriptRef.current = interimTranscript.trim()
+        }
+
         if (finalTranscript.trim()) {
           speechTranscriptRef.current = speechTranscriptRef.current
             ? `${speechTranscriptRef.current} ${finalTranscript.trim()}`
             : finalTranscript.trim()
+          browserPartialTranscriptRef.current = ''
         }
       }
       recognition.onerror = () => {
+        resetBrowserRecognition()
         setMicEnabled(false)
         setMicStatus('Tap mic to restart CC')
       }
@@ -821,12 +858,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       return
     }
 
-    browserRecognitionRef.current?.stop()
-    browserRecognitionRef.current = null
-    if (browserRestartTimerRef.current) {
-      window.clearTimeout(browserRestartTimerRef.current)
-      browserRestartTimerRef.current = null
-    }
+    resetBrowserRecognition()
     WebSpeechRecognition.stopListening()
   }
 

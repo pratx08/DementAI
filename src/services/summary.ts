@@ -4,6 +4,18 @@ export const DEFAULT_SUMMARY =
   'Conversation summary will appear here after the next visit.'
 
 const MAX_SUMMARY_CHARS = 210
+const TRIVIAL_WORDS = new Set([
+  'no',
+  'yes',
+  'yeah',
+  'ok',
+  'okay',
+  'hi',
+  'hello',
+  'hey',
+  'um',
+  'uh',
+])
 
 export function isPlaceholderSummary(text: string): boolean {
   const normalized = text.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -24,6 +36,16 @@ function normalizeText(text: string) {
     .replace(/\s+([,.!?])/g, '$1')
     .replace(/^[,.\s]+|[,.\s]+$/g, '')
     .trim()
+}
+
+export function hasSummarizableContent(text: string) {
+  const words = normalizeText(text)
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((word) => !TRIVIAL_WORDS.has(word))
+
+  return words.length >= 5
 }
 
 function sentenceCase(text: string) {
@@ -178,6 +200,10 @@ export function warmConversationSummarizer() {
 }
 
 export async function summarizeConversation(transcript: string) {
+  if (!hasSummarizableContent(transcript)) {
+    return ''
+  }
+
   try {
     const response = await apiPost<{ summary: string }>('/summarize', {
       transcript,
