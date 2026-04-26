@@ -1,17 +1,7 @@
 export const DEFAULT_SUMMARY =
   'Conversation summary will appear here after the next visit.'
 
-const IMPORTANT_PATTERNS = [
-  /\b(today|tomorrow|tonight|yesterday|morning|afternoon|evening|friday|monday|tuesday|wednesday|thursday|saturday|sunday)\b/i,
-  /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i,
-  /\b(medicine|medication|tablet|pill|doctor|clinic|checkup|appointment|walk|visit|call|water|photo|album|lunch|dinner|breakfast)\b/i,
-  /\b(changed|planned|remember|brought|left|take|come|came|meet|met|feeling|better)\b/i,
-]
-
-const FILLER_PATTERNS = [
-  /\b(hi|hello|hey|good morning|good afternoon|good evening|okay|ok|yeah|yes|well|so|actually|basically|please)\b/gi,
-  /\b(you know|like|i mean|this is|that is|it is)\b/gi,
-]
+const MAX_SUMMARY_CHARS = 210
 
 export function isPlaceholderSummary(text: string): boolean {
   const normalized = text.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -24,11 +14,23 @@ export function isPlaceholderSummary(text: string): boolean {
   )
 }
 
-function normalizeSummary(text: string) {
-  const cleaned = text
+function normalizeText(text: string) {
+  return text
+    .replace(/\b(hi|hello|hey|good morning|good afternoon|good evening|okay|ok|yeah|yes|well|please)\b/gi, ' ')
+    .replace(/\b(you know|i mean|like|basically|actually)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.!?])/g, '$1')
+    .replace(/^[,.\s]+|[,.\s]+$/g, '')
     .trim()
+}
+
+function sentenceCase(text: string) {
+  const trimmed = text.trim()
+  return trimmed ? trimmed.charAt(0).toUpperCase() + trimmed.slice(1) : ''
+}
+
+function finishSentence(text: string) {
+  const cleaned = text.replace(/\s+/g, ' ').trim()
 
   if (!cleaned) {
     return DEFAULT_SUMMARY
@@ -37,116 +39,136 @@ function normalizeSummary(text: string) {
   return cleaned.endsWith('.') ? cleaned : `${cleaned}.`
 }
 
-function sentenceCase(text: string) {
-  const trimmed = text.trim()
+function extractSpeaker(text: string) {
+  const match = text.match(/\b(?:it'?s|it is|this is)\s+me,?\s+([a-z][a-z'-]+)/i)
+  return match ? sentenceCase(match[1]) : ''
+}
 
-  if (!trimmed) {
+function getTime(text: string) {
+  return text.match(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i)?.[0]?.toUpperCase()
+}
+
+function getDay(text: string) {
+  return text.match(
+    /\b(today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+  )?.[0]?.toLowerCase()
+}
+
+function getMedicineNote(text: string) {
+  if (!/\b(medicine|medication|tablet|pill|dose)\b/i.test(text)) {
     return ''
   }
 
-  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
-}
+  const time = getTime(text)
+  const color = text.match(/\b(blue|red|white|yellow|green|pink)\s+(tablet|pill)\b/i)?.[0]
+  const medicine = color ?? text.match(/\b(evening|morning|night)\s+(medicine|medication|tablet|pill)\b/i)?.[0]
 
-function cleanTranscript(text: string) {
-  let cleaned = text.replace(/\s+/g, ' ').trim()
-
-  for (const pattern of FILLER_PATTERNS) {
-    cleaned = cleaned.replace(pattern, ' ')
+  if (time && medicine) {
+    return `Take the ${medicine.toLowerCase()} at ${time}`
   }
 
-  return cleaned
-    .replace(/\s+/g, ' ')
-    .replace(/^[,.\s]+|[,.\s]+$/g, '')
-    .trim()
-}
-
-function extractSpeaker(text: string) {
-  const match = text.match(/\b(?:it's|it is|this is)\s+me,?\s+([a-z][a-z'-]+)/i)
-  return match?.[1]
-}
-
-function splitConversation(text: string) {
-  return text
-    .split(/(?<=[.!?])\s+|\s+(?:and then|also|but|so)\s+/i)
-    .map((part) => part.replace(/\s+/g, ' ').trim())
-    .filter((part) => part.length > 6)
-}
-
-function scoreClause(text: string) {
-  return IMPORTANT_PATTERNS.reduce(
-    (score, pattern) => score + (pattern.test(text) ? 1 : 0),
-    0,
-  )
-}
-
-function rewritePerspective(text: string, speaker?: string) {
-  let rewritten = text
-    .replace(/\bit'?s me,?\s+[a-z][a-z'-]+\.?/i, '')
-    .replace(/\byour\s+(son|daughter|friend|caregiver|doctor|nurse|wife|husband)\b/gi, 'the $1')
-    .replace(/\byou told me\b/gi, 'the patient said')
-    .replace(/\byou were\b/gi, 'the patient was')
-    .replace(/\byou are\b/gi, 'the patient is')
-    .replace(/\byou need to\b/gi, 'the patient should')
-    .replace(/\byour\b/gi, 'the patient\'s')
-    .replace(/\byou\b/gi, 'the patient')
-    .replace(/\bwe\b/gi, 'they')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (speaker) {
-    const name = sentenceCase(speaker)
-    rewritten = rewritten
-      .replace(/\bi came\b/i, `${name} came`)
-      .replace(/\bi brought\b/i, `${name} brought`)
-      .replace(/\bi left\b/i, `${name} left`)
-      .replace(/\bi'?ll come\b/i, `${name} will come`)
-      .replace(/\bi will come\b/i, `${name} will come`)
-      .replace(/\bi'?ll call\b/i, `${name} will call`)
-      .replace(/\bi will call\b/i, `${name} will call`)
-      .replace(/\bi am taking\b/i, `${name} is taking`)
-      .replace(/\bi'm taking\b/i, `${name} is taking`)
+  if (time) {
+    return `Medicine is due at ${time}`
   }
 
-  return sentenceCase(rewritten)
+  return 'Medicine update was discussed'
 }
 
-function compressClause(text: string) {
-  return text
-    .replace(/\bafter work today\b/i, 'after work')
-    .replace(/\baround\s+(\d{1,2})\b/i, 'around $1')
-    .replace(/\bshort\s+walk\s+in\s+the\s+garden\b/i, 'short garden walk')
-    .replace(/\s+/g, ' ')
-    .trim()
+function getVisitNote(text: string, speaker: string) {
+  const day = getDay(text)
+  const time = getTime(text)
+  const actor = speaker || 'Visitor'
+
+  if (/\b(walk|garden)\b/i.test(text)) {
+    const when = [day, time].filter(Boolean).join(' at ')
+    return when
+      ? `${actor} will come ${when} for a short walk`
+      : `${actor} discussed a short walk`
+  }
+
+  if (/\b(clinic|doctor|checkup|appointment|hospital)\b/i.test(text)) {
+    const when = [day, time].filter(Boolean).join(' at ')
+    return when
+      ? `${actor} will take the patient to the appointment ${when}`
+      : `${actor} discussed a medical appointment`
+  }
+
+  if (/\b(visit|come|meet|call)\b/i.test(text)) {
+    const when = [day, time].filter(Boolean).join(' at ')
+    return when
+      ? `${actor} plans to visit ${when}`
+      : `${actor} discussed a follow-up visit`
+  }
+
+  return ''
+}
+
+function getWellbeingNote(text: string) {
+  if (/\b(feeling|felt)\s+better\b/i.test(text)) {
+    return 'Patient was feeling better'
+  }
+
+  if (/\b(water|bottle)\b/i.test(text)) {
+    return 'Water was left nearby'
+  }
+
+  if (/\b(photo|album|family photos)\b/i.test(text)) {
+    return 'They looked at family photos'
+  }
+
+  return ''
+}
+
+function dedupe(notes: string[]) {
+  const seen = new Set<string>()
+  return notes.filter((note) => {
+    const key = note.toLowerCase()
+
+    if (!note || seen.has(key)) {
+      return false
+    }
+
+    seen.add(key)
+    return true
+  })
+}
+
+function trimSummary(text: string) {
+  if (text.length <= MAX_SUMMARY_CHARS) {
+    return text
+  }
+
+  const clipped = text.slice(0, MAX_SUMMARY_CHARS)
+  const lastBreak = Math.max(clipped.lastIndexOf('.'), clipped.lastIndexOf(';'))
+
+  return lastBreak > 80 ? clipped.slice(0, lastBreak + 1) : `${clipped.trim()}...`
 }
 
 function lightweightSummary(transcript: string) {
-  const speaker = extractSpeaker(transcript)
-  const cleaned = cleanTranscript(transcript)
-  const clauses = splitConversation(cleaned)
-  const ranked = clauses
-    .map((clause, index) => ({
-      clause,
-      index,
-      score: scoreClause(clause),
-    }))
-    .filter((item) => item.score > 0)
-    .sort((left, right) => right.score - left.score || left.index - right.index)
-    .slice(0, 3)
-    .sort((left, right) => left.index - right.index)
-    .map((item) => compressClause(rewritePerspective(item.clause, speaker)))
-    .filter(Boolean)
+  const cleaned = normalizeText(transcript)
 
-  const unique = ranked.filter(
-    (item, index, list) =>
-      list.findIndex((other) => other.toLowerCase() === item.toLowerCase()) === index,
-  )
-
-  if (unique.length > 0) {
-    return normalizeSummary(unique.join(' '))
+  if (!cleaned) {
+    return DEFAULT_SUMMARY
   }
 
-  const fallback = rewritePerspective(clauses[0] ?? cleaned.slice(0, 120), speaker)
-  return normalizeSummary(fallback)
+  const speaker = extractSpeaker(cleaned)
+  const notes = dedupe([
+    getMedicineNote(cleaned),
+    getVisitNote(cleaned, speaker),
+    getWellbeingNote(cleaned),
+  ]).slice(0, 2)
+
+  if (notes.length > 0) {
+    return finishSentence(trimSummary(notes.join('; ')))
+  }
+
+  const compact = cleaned
+    .replace(/\b(?:it'?s|it is|this is)\s+me,?\s+[a-z][a-z'-]+\.?/i, '')
+    .replace(/\byou\b/gi, 'the patient')
+    .split(/(?<=[.!?])\s+/)[0]
+    .slice(0, 130)
+
+  return finishSentence(sentenceCase(compact))
 }
 
 export function warmConversationSummarizer() {
