@@ -2206,8 +2206,13 @@ body {
 .landing-suffix-wrap {
   position: relative;
   display: inline-flex;
-  min-width: 2ch;
-  perspective: 600px;
+  min-width: 2.1ch;
+  perspective: 1000px;
+}
+
+.landing-suffix-inner {
+  display: flex;
+  transform-style: preserve-3d;
 }
 
 /* Tagline */
