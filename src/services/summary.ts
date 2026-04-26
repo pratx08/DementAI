@@ -3,7 +3,7 @@ import { apiPost } from './apiClient'
 export const DEFAULT_SUMMARY =
   'Conversation summary will appear here after the next visit.'
 
-const MAX_SUMMARY_CHARS = 210
+const MAX_SUMMARY_CHARS = 360
 const TRIVIAL_WORDS = new Set([
   'no',
   'yes',
@@ -180,7 +180,7 @@ function lightweightSummary(transcript: string) {
     getMedicineNote(cleaned),
     getVisitNote(cleaned, speaker),
     getWellbeingNote(cleaned),
-  ]).slice(0, 2)
+  ]).slice(0, 3)
 
   if (notes.length > 0) {
     return finishSentence(trimSummary(notes.join('; ')))
@@ -190,7 +190,7 @@ function lightweightSummary(transcript: string) {
     .replace(/\b(?:it'?s|it is|this is)\s+me,?\s+[a-z][a-z'-]+\.?/i, '')
     .replace(/\byou\b/gi, 'the patient')
     .split(/(?<=[.!?])\s+/)[0]
-    .slice(0, 130)
+    .slice(0, 260)
 
   return finishSentence(sentenceCase(compact))
 }

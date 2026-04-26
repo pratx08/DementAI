@@ -660,8 +660,10 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }, appConfig.recognition.speechPauseMs)
   }, [handleFaceSpeechStopped, lockConversationPerson])
 
-  const resetBrowserRecognition = useCallback(() => {
-    captionEnabledRef.current = false
+  const resetBrowserRecognition = useCallback((disableCaptions = true) => {
+    if (disableCaptions) {
+      captionEnabledRef.current = false
+    }
 
     if (browserRestartTimerRef.current) {
       window.clearTimeout(browserRestartTimerRef.current)
@@ -710,6 +712,81 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
 
     cleanupGeminiAudio()
+  }
+
+  function startBrowserLiveCaptions(captureTranscript: boolean) {
+    const BrowserSpeechRecognition = getBrowserSpeechRecognition()
+
+    if (!BrowserSpeechRecognition) {
+      return false
+    }
+
+    browserRecognitionRef.current?.stop()
+
+    const recognition = new BrowserSpeechRecognition()
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognition.onresult = (event) => {
+      let interimTranscript = ''
+      let finalTranscript = ''
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index]
+        const transcript = result[0]?.transcript ?? ''
+
+        if (result.isFinal) {
+          finalTranscript += transcript
+        } else {
+          interimTranscript += transcript
+        }
+      }
+
+      const text = getLiveCaption(interimTranscript, finalTranscript)
+
+      if (text) {
+        applyCaptionText(text)
+        lockConversationPerson()
+        if (captureTranscript) {
+          resetSilenceTimer()
+        }
+      }
+
+      if (!captureTranscript) {
+        return
+      }
+
+      if (interimTranscript.trim()) {
+        browserPartialTranscriptRef.current = interimTranscript.trim()
+      }
+
+      if (finalTranscript.trim()) {
+        speechTranscriptRef.current = speechTranscriptRef.current
+          ? `${speechTranscriptRef.current} ${finalTranscript.trim()}`
+          : finalTranscript.trim()
+        browserPartialTranscriptRef.current = ''
+      }
+    }
+    recognition.onerror = () => {
+      resetBrowserRecognition(captureTranscript)
+      if (captureTranscript) {
+        setMicEnabled(false)
+        setMicStatus('Tap mic to restart CC')
+      }
+    }
+    recognition.onend = () => {
+      if (!captionEnabledRef.current || document.visibilityState !== 'visible') {
+        return
+      }
+
+      browserRestartTimerRef.current = window.setTimeout(() => {
+        recognition.start()
+      }, 350)
+    }
+    browserRecognitionRef.current = recognition
+    recognition.start()
+
+    return true
   }
 
   async function beginGeminiAudioCapture() {
@@ -763,14 +840,12 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
       void (async () => {
         try {
-          setMicStatus('Transcribing conversation...')
           const blob = new Blob(chunks, { type: mimeType })
           const transcript = await transcribeAudio(blob)
 
           if (transcript) {
             speechTranscriptRef.current = transcript
             applyCaptionText(transcript)
-            setMicStatus('Summarizing conversation...')
             await handleFaceSpeechStopped()
           }
         } catch {
@@ -813,7 +888,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }, GEMINI_SPEECH_CHECK_MS)
 
     recorder.start(500)
-    setMicStatus('Listening for conversation...')
+    setMicStatus('')
     return true
   }
 
@@ -899,7 +974,11 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
   async function startWebCaptions() {
     if ('MediaRecorder' in window && window.AudioContext) {
-      return beginGeminiAudioCapture()
+      const didStartGeminiCapture = await beginGeminiAudioCapture()
+      if (didStartGeminiCapture) {
+        startBrowserLiveCaptions(false)
+      }
+      return didStartGeminiCapture
     }
 
     const BrowserSpeechRecognition = getBrowserSpeechRecognition()
@@ -913,63 +992,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     await requestMicPermission()
 
     if (BrowserSpeechRecognition) {
-      browserRecognitionRef.current?.stop()
-
-      const recognition = new BrowserSpeechRecognition()
-      recognition.continuous = false
-      recognition.interimResults = true
-      recognition.lang = 'en-US'
-      recognition.onresult = (event) => {
-        let interimTranscript = ''
-        let finalTranscript = ''
-
-        for (let index = event.resultIndex; index < event.results.length; index += 1) {
-          const result = event.results[index]
-          const transcript = result[0]?.transcript ?? ''
-
-          if (result.isFinal) {
-            finalTranscript += transcript
-          } else {
-            interimTranscript += transcript
-          }
-        }
-
-        const text = getLiveCaption(interimTranscript, finalTranscript)
-
-        if (text) {
-          applyCaptionText(text)
-          resetSilenceTimer()
-        }
-
-        if (interimTranscript.trim()) {
-          browserPartialTranscriptRef.current = interimTranscript.trim()
-        }
-
-        if (finalTranscript.trim()) {
-          speechTranscriptRef.current = speechTranscriptRef.current
-            ? `${speechTranscriptRef.current} ${finalTranscript.trim()}`
-            : finalTranscript.trim()
-          browserPartialTranscriptRef.current = ''
-        }
-      }
-      recognition.onerror = () => {
-        resetBrowserRecognition()
-        setMicEnabled(false)
-        setMicStatus('Tap mic to restart CC')
-      }
-      recognition.onend = () => {
-        if (!captionEnabledRef.current || document.visibilityState !== 'visible') {
-          return
-        }
-
-        browserRestartTimerRef.current = window.setTimeout(() => {
-          recognition.start()
-        }, 350)
-      }
-      browserRecognitionRef.current = recognition
-      recognition.start()
-
-      return true
+      return startBrowserLiveCaptions(true)
     }
 
     await WebSpeechRecognition.startListening({
@@ -1015,12 +1038,13 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       silenceTimerRef.current = null
     }
 
-    if (geminiMediaRecorderRef.current) {
-      stopGeminiAudioCapture(true)
-      return
-    }
+    const isGeminiRecording = Boolean(geminiMediaRecorderRef.current)
 
-    await handleFaceSpeechStopped()
+    if (isGeminiRecording) {
+      stopGeminiAudioCapture(true)
+    } else {
+      await handleFaceSpeechStopped()
+    }
 
     if (isNativeApp) {
       await NativeSpeechRecognition.stop().catch(() => undefined)
