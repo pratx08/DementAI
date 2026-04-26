@@ -9,8 +9,13 @@ const app = express()
 const port = Number(process.env.PORT || 4000)
 const mongoUri = process.env.MONGODB_URI
 const dbName = process.env.MONGODB_DB_NAME || 'dementai'
-const geminiApiKey = process.env.GEMINI_API_KEY
-const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+const geminiApiKey =
+  process.env.GEMINI_API_KEY ||
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+  process.env.GOOGLE_API_KEY
+const geminiModel = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
+const geminiSummaryModel = process.env.GEMINI_SUMMARY_MODEL || geminiModel
+const geminiSpeechModel = process.env.GEMINI_STT_MODEL || geminiModel
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const distPath = path.resolve(__dirname, '..', 'dist')
@@ -36,7 +41,51 @@ async function getDb() {
 }
 
 app.use(cors())
-app.use(express.json({ limit: '5mb' }))
+app.use(express.json({ limit: '20mb' }))
+
+function extractGeminiText(data) {
+  return data?.candidates?.[0]?.content?.parts
+    ?.map((part) => part?.text ?? '')
+    ?.join(' ')
+    ?.replace(/\s+/g, ' ')
+    ?.trim() ?? ''
+}
+
+async function generateGeminiContent(model, parts, generationConfig) {
+  if (!geminiApiKey) {
+    const error = new Error('Gemini is not configured.')
+    error.status = 503
+    throw error
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts,
+          },
+        ],
+        generationConfig,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    const error = new Error(errorText.slice(0, 300) || 'Gemini request failed.')
+    error.status = 502
+    throw error
+  }
+
+  return response.json()
+}
 
 app.get('/api/health', async (_req, res) => {
   if (!isMongoConfigured()) {
@@ -201,11 +250,6 @@ app.post('/api/summarize', async (req, res) => {
     return
   }
 
-  if (!geminiApiKey) {
-    res.status(503).json({ error: 'Gemini is not configured.' })
-    return
-  }
-
   const prompt = [
     'Summarize this dementia-care conversation for a face-recognition memory card.',
     'Do not copy the transcript.',
@@ -217,44 +261,15 @@ app.post('/api/summarize', async (req, res) => {
   ].join('\n')
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    const data = await generateGeminiContent(
+      geminiSummaryModel,
+      [{ text: prompt }],
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 60,
-          },
-        }),
+        temperature: 0.2,
+        maxOutputTokens: 60,
       },
     )
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      res.status(502).json({
-        error: 'Gemini summarization failed.',
-        detail: errorText.slice(0, 300),
-      })
-      return
-    }
-
-    const data = await response.json()
-    const summary =
-      data?.candidates?.[0]?.content?.parts
-        ?.map((part) => part?.text ?? '')
-        ?.join(' ')
-        ?.replace(/\s+/g, ' ')
-        ?.trim() ?? ''
+    const summary = extractGeminiText(data)
 
     if (!summary) {
       res.status(502).json({ error: 'Gemini returned an empty summary.' })
@@ -263,8 +278,67 @@ app.post('/api/summarize', async (req, res) => {
 
     res.json({ summary })
   } catch (error) {
-    res.status(500).json({
-      error: error instanceof Error ? error.message : 'Could not summarize conversation.',
+    res.status(error.status ?? 500).json({
+      error:
+        error.status === 502
+          ? 'Gemini summarization failed.'
+          : error instanceof Error ? error.message : 'Could not summarize conversation.',
+      detail: error.status === 502 && error instanceof Error ? error.message : undefined,
+    })
+  }
+})
+
+app.post('/api/transcribe', async (req, res) => {
+  const audioBase64 =
+    typeof req.body?.audioBase64 === 'string' ? req.body.audioBase64.trim() : ''
+  const mimeType =
+    typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : ''
+
+  if (!audioBase64 || !mimeType) {
+    res.status(400).json({ error: 'Audio and MIME type are required.' })
+    return
+  }
+
+  const prompt = [
+    'Generate an accurate transcript of the speech in this audio.',
+    'Return only the spoken words as plain text.',
+    'Do not add commentary, labels, timestamps, markdown, or speaker names unless they were spoken.',
+  ].join('\n')
+
+  try {
+    const data = await generateGeminiContent(
+      geminiSpeechModel,
+      [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType,
+            data: audioBase64,
+          },
+        },
+      ],
+      {
+        temperature: 0,
+        maxOutputTokens: 1024,
+      },
+    )
+    const transcript = extractGeminiText(data)
+      .replace(/^transcript:\s*/i, '')
+      .trim()
+
+    if (!transcript) {
+      res.status(502).json({ error: 'Gemini returned an empty transcript.' })
+      return
+    }
+
+    res.json({ transcript })
+  } catch (error) {
+    res.status(error.status ?? 500).json({
+      error:
+        error.status === 502
+          ? 'Gemini transcription failed.'
+          : error instanceof Error ? error.message : 'Could not transcribe audio.',
+      detail: error.status === 502 && error instanceof Error ? error.message : undefined,
     })
   }
 })
