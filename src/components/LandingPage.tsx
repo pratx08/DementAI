@@ -80,9 +80,8 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
               animate={{
                 opacity: 1,
                 x: swapped ? ['0ch', '0.54ch', '1.08ch'] : ['1.08ch', '0.54ch', '0ch'],
-                y: swapped ? ['0em', '-0.34em', '0em'] : ['0em', '0.34em', '0em'],
-                rotateZ: swapped ? [0, -11, 0] : [0, 9, 0],
-                scale: swapped ? [1, 1.08, 1] : [1, 0.98, 1],
+                y: 0,
+                scale: swapped ? [1, 1.04, 1] : [1, 1.02, 1],
                 color: swapped ? '#36B37E' : '#f7fff9',
               }}
               transition={{
@@ -101,9 +100,8 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
               animate={{
                 opacity: 1,
                 x: swapped ? ['1.08ch', '0.54ch', '0ch'] : ['0ch', '0.54ch', '1.08ch'],
-                y: swapped ? ['0em', '0.34em', '0em'] : ['0em', '-0.34em', '0em'],
-                rotateZ: swapped ? [0, 11, 0] : [0, -9, 0],
-                scale: swapped ? [1, 1.08, 1] : [1, 0.98, 1],
+                y: 0,
+                scale: swapped ? [1, 1.04, 1] : [1, 1.02, 1],
                 color: swapped ? '#36B37E' : '#f7fff9',
               }}
               transition={{

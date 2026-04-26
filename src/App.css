@@ -2206,6 +2206,7 @@ body {
 .landing-suffix-wrap {
   position: relative;
   display: inline-flex;
+  align-self: baseline;
   width: 2.18ch;
   height: 1em;
   min-width: 2.18ch;
@@ -2249,8 +2250,9 @@ body {
 
 .landing-suffix-letter {
   position: absolute;
-  top: 0;
+  top: 0.01em;
   left: 0;
+  line-height: 1;
   transform-style: preserve-3d;
   backface-visibility: hidden;
   text-shadow: 0 0 0 rgba(54, 179, 126, 0);
