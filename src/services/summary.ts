@@ -1,3 +1,5 @@
+import { apiPost } from './apiClient'
+
 export const DEFAULT_SUMMARY =
   'Conversation summary will appear here after the next visit.'
 
@@ -176,5 +178,18 @@ export function warmConversationSummarizer() {
 }
 
 export async function summarizeConversation(transcript: string) {
+  try {
+    const response = await apiPost<{ summary: string }>('/summarize', {
+      transcript,
+    })
+    const summary = response.summary?.trim()
+
+    if (summary) {
+      return finishSentence(trimSummary(summary))
+    }
+  } catch {
+    // Fall back to the local summarizer when the backend or Gemini is unavailable.
+  }
+
   return lightweightSummary(transcript)
 }

@@ -9,6 +9,8 @@ const app = express()
 const port = Number(process.env.PORT || 4000)
 const mongoUri = process.env.MONGODB_URI
 const dbName = process.env.MONGODB_DB_NAME || 'dementai'
+const geminiApiKey = process.env.GEMINI_API_KEY
+const geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const distPath = path.resolve(__dirname, '..', 'dist')
@@ -185,6 +187,84 @@ app.put('/api/summaries/:personId', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Could not save summary.',
+    })
+  }
+})
+
+app.post('/api/summarize', async (req, res) => {
+  const transcript = typeof req.body?.transcript === 'string'
+    ? req.body.transcript.trim()
+    : ''
+
+  if (!transcript) {
+    res.status(400).json({ error: 'Transcript is required.' })
+    return
+  }
+
+  if (!geminiApiKey) {
+    res.status(503).json({ error: 'Gemini is not configured.' })
+    return
+  }
+
+  const prompt = [
+    'Summarize this dementia-care conversation for a face-recognition memory card.',
+    'Do not copy the transcript.',
+    'Keep only important care context: medication, visit plans, appointments, emotional state, relationship context, or objects left nearby.',
+    'Maximum 25 words.',
+    'Return plain text only.',
+    '',
+    `Conversation: ${transcript}`,
+  ].join('\n')
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 60,
+          },
+        }),
+      },
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      res.status(502).json({
+        error: 'Gemini summarization failed.',
+        detail: errorText.slice(0, 300),
+      })
+      return
+    }
+
+    const data = await response.json()
+    const summary =
+      data?.candidates?.[0]?.content?.parts
+        ?.map((part) => part?.text ?? '')
+        ?.join(' ')
+        ?.replace(/\s+/g, ' ')
+        ?.trim() ?? ''
+
+    if (!summary) {
+      res.status(502).json({ error: 'Gemini returned an empty summary.' })
+      return
+    }
+
+    res.json({ summary })
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Could not summarize conversation.',
     })
   }
 })
