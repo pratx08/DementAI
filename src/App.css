@@ -2207,8 +2207,7 @@ body {
   position: relative;
   display: inline-flex;
   vertical-align: baseline;
-  height: 1.1em;
-  overflow: hidden; /* This creates the "window" for the roll */
+  perspective: 1000px;
   margin-left: -0.02em;
 }
 
@@ -2216,6 +2215,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0;
+  transform-style: preserve-3d;
   will-change: transform, opacity;
 }
 

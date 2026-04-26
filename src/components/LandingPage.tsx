@@ -61,17 +61,12 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
               <motion.span
                 key={swapped ? 'ai' : 'ia'}
                 className="landing-suffix-inner"
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: '0%', opacity: 1 }}
-                exit={{ y: '-100%', opacity: 0 }}
+                initial={{ rotateY: -90, opacity: 0 }}
+                animate={{ rotateY: 0, opacity: 1 }}
+                exit={{ rotateY: 90, opacity: 0 }}
                 transition={{
-                  y: {
-                    type: 'spring',
-                    stiffness: 45,
-                    damping: 14,
-                    mass: 1,
-                  },
-                  opacity: { duration: 0.4 }
+                  duration: 0.7,
+                  ease: [0.23, 1, 0.32, 1]
                 }}
               >
                 {swapped ? (
