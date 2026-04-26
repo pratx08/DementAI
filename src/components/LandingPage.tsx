@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 const LETTERS = ['D', 'E', 'M', 'E', 'N', 'T']
-const LETTER_STAGGER = 0.08
-const FIRST_SWAP_DELAY = 1500
-const SWAP_DURATION = 2200 // Slowed down for smoothness
-const LOOP_DELAY = 4800 // Longer pause for effect
-const BUTTON_DELAY = 2500
+const LETTER_STAGGER = 0.055
+const FIRST_SWAP_DELAY = 850
+const SWAP_DURATION = 850
+const LOOP_DELAY = 1450
+const BUTTON_DELAY = 1350
+const SWAP_TRANSITION = {
+  duration: SWAP_DURATION / 1000,
+  ease: [0.76, 0, 0.24, 1],
+} as const
 
 export function LandingPage({ onStart }: { onStart: () => void }) {
   const [swapped, setSwapped] = useState(false)
@@ -58,36 +62,46 @@ export function LandingPage({ onStart }: { onStart: () => void }) {
           </span>
 
           <span className="landing-suffix-wrap" aria-hidden>
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span
-                key={swapped ? 'ai' : 'ia'}
-                initial={{ opacity: 0, y: 30, rotateX: 90 }}
-                animate={{ opacity: 1, y: 0, rotateX: 0 }}
-                exit={{ opacity: 0, y: -30, rotateX: -90 }}
-                transition={{
-                  duration: SWAP_DURATION / 1000,
-                  ease: [0.76, 0, 0.24, 1],
-                }}
-                className="landing-suffix-inner"
-                style={{ display: 'flex' }}
-              >
-                {swapped ? (
-                  <>
-                    <span className="landing-letter landing-letter--suffix landing-letter--ai">
-                      A
-                    </span>
-                    <span className="landing-letter landing-letter--suffix landing-letter--ai">
-                      I
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="landing-letter landing-letter--suffix">I</span>
-                    <span className="landing-letter landing-letter--suffix">A</span>
-                  </>
-                )}
-              </motion.span>
-            </AnimatePresence>
+            <motion.span
+              className="landing-letter landing-letter--suffix landing-suffix-letter"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{
+                opacity: 1,
+                x: swapped ? '1.02ch' : '0ch',
+                y: 0,
+                rotateY: swapped ? 180 : 0,
+                color: swapped ? '#36B37E' : '#f7fff9',
+              }}
+              transition={{
+                ...SWAP_TRANSITION,
+                opacity: {
+                  delay: LETTERS.length * LETTER_STAGGER,
+                  duration: 0.45,
+                },
+              }}
+            >
+              I
+            </motion.span>
+            <motion.span
+              className="landing-letter landing-letter--suffix landing-suffix-letter"
+              initial={{ opacity: 0, x: '1.02ch', y: 20 }}
+              animate={{
+                opacity: 1,
+                x: swapped ? '0ch' : '1.02ch',
+                y: 0,
+                rotateY: swapped ? -180 : 0,
+                color: swapped ? '#36B37E' : '#f7fff9',
+              }}
+              transition={{
+                ...SWAP_TRANSITION,
+                opacity: {
+                  delay: (LETTERS.length + 1) * LETTER_STAGGER,
+                  duration: 0.45,
+                },
+              }}
+            >
+              A
+            </motion.span>
           </span>
         </div>
 
