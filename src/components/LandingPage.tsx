@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 const LETTERS = ['D', 'E', 'M', 'E', 'N', 'T']
 const LETTER_STAGGER = 0.08
-const FIRST_SWAP_DELAY = 1200
-const LOOP_DELAY = 4500
-const BUTTON_DELAY = 2200
+const FIRST_SWAP_DELAY = 1000
+const LOOP_DELAY = 2200
+const BUTTON_DELAY = 1500
 
 export function LandingPage({ onStart }: { onStart: () => void }) {
   const [swapped, setSwapped] = useState(false)
