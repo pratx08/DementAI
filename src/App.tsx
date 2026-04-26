@@ -96,7 +96,7 @@ type CaretakerTab =
   | 'cognitive-report'
 
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
-const GEMINI_SPEECH_LEVEL_THRESHOLD = 0.018
+const GEMINI_SPEECH_LEVEL_THRESHOLD = 0.01
 const GEMINI_SPEECH_CHECK_MS = 150
 
 function getPreferredAudioMimeType() {
@@ -130,6 +130,10 @@ function getLiveCaption(interimTranscript: string, finalTranscript: string) {
 
 function getBrowserSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition
+}
+
+function getWordCount(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length
 }
 
 async function requestMicPermission() {
@@ -714,7 +718,10 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     cleanupGeminiAudio()
   }
 
-  function startBrowserLiveCaptions(captureTranscript: boolean) {
+  function startBrowserLiveCaptions(
+    captureTranscript: boolean,
+    scheduleSummary: boolean,
+  ) {
     const BrowserSpeechRecognition = getBrowserSpeechRecognition()
 
     if (!BrowserSpeechRecognition) {
@@ -747,7 +754,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       if (text) {
         applyCaptionText(text)
         lockConversationPerson()
-        if (captureTranscript) {
+        if (scheduleSummary) {
           resetSilenceTimer()
         }
       }
@@ -844,8 +851,20 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
           const transcript = await transcribeAudio(blob)
 
           if (transcript) {
-            speechTranscriptRef.current = transcript
-            applyCaptionText(transcript)
+            const existingTranscript = speechTranscriptRef.current.trim()
+            const livePartial = browserPartialTranscriptRef.current.trim()
+            const liveTranscript = [existingTranscript, livePartial]
+              .filter(Boolean)
+              .join(' ')
+              .trim()
+            const finalTranscript =
+              getWordCount(liveTranscript) > getWordCount(transcript)
+                ? liveTranscript
+                : transcript
+
+            speechTranscriptRef.current = finalTranscript
+            browserPartialTranscriptRef.current = ''
+            applyCaptionText(finalTranscript)
             await handleFaceSpeechStopped()
           }
         } catch {
@@ -976,7 +995,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     if ('MediaRecorder' in window && window.AudioContext) {
       const didStartGeminiCapture = await beginGeminiAudioCapture()
       if (didStartGeminiCapture) {
-        startBrowserLiveCaptions(false)
+        startBrowserLiveCaptions(true, false)
       }
       return didStartGeminiCapture
     }
@@ -992,7 +1011,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     await requestMicPermission()
 
     if (BrowserSpeechRecognition) {
-      return startBrowserLiveCaptions(true)
+      return startBrowserLiveCaptions(true, true)
     }
 
     await WebSpeechRecognition.startListening({
