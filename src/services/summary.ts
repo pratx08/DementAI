@@ -3,7 +3,7 @@ import { apiPost } from './apiClient'
 export const DEFAULT_SUMMARY =
   'Conversation summary will appear here after the next visit.'
 
-const MAX_SUMMARY_CHARS = 360
+const MAX_SUMMARY_CHARS = 520
 const TRIVIAL_WORDS = new Set([
   'no',
   'yes',
@@ -63,6 +63,10 @@ function finishSentence(text: string) {
   return cleaned.endsWith('.') ? cleaned : `${cleaned}.`
 }
 
+function wordCount(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
 function extractSpeaker(text: string) {
   const match = text.match(/\b(?:it'?s|it is|this is)\s+me,?\s+([a-z][a-z'-]+)/i)
   return match ? sentenceCase(match[1]) : ''
@@ -88,14 +92,14 @@ function getMedicineNote(text: string) {
   const medicine = color ?? text.match(/\b(evening|morning|night)\s+(medicine|medication|tablet|pill)\b/i)?.[0]
 
   if (time && medicine) {
-    return `Take the ${medicine.toLowerCase()} at ${time}`
+    return `Medication was discussed, including taking the ${medicine.toLowerCase()} at ${time}`
   }
 
   if (time) {
-    return `Medicine is due at ${time}`
+    return `Medication was discussed, with the next dose due at ${time}`
   }
 
-  return 'Medicine update was discussed'
+  return 'Medication or care instructions were discussed during the conversation'
 }
 
 function getVisitNote(text: string, speaker: string) {
@@ -106,22 +110,22 @@ function getVisitNote(text: string, speaker: string) {
   if (/\b(walk|garden)\b/i.test(text)) {
     const when = [day, time].filter(Boolean).join(' at ')
     return when
-      ? `${actor} will come ${when} for a short walk`
-      : `${actor} discussed a short walk`
+      ? `${actor} said they will come ${when} for a short walk`
+      : `${actor} discussed taking the patient for a short walk`
   }
 
   if (/\b(clinic|doctor|checkup|appointment|hospital)\b/i.test(text)) {
     const when = [day, time].filter(Boolean).join(' at ')
     return when
-      ? `${actor} will take the patient to the appointment ${when}`
-      : `${actor} discussed a medical appointment`
+      ? `${actor} said they will take the patient to the appointment ${when}`
+      : `${actor} discussed an upcoming medical appointment with the patient`
   }
 
   if (/\b(visit|come|meet|call)\b/i.test(text)) {
     const when = [day, time].filter(Boolean).join(' at ')
     return when
-      ? `${actor} plans to visit ${when}`
-      : `${actor} discussed a follow-up visit`
+      ? `${actor} said they plan to visit ${when}`
+      : `${actor} discussed a follow-up visit with the patient`
   }
 
   return ''
@@ -129,15 +133,15 @@ function getVisitNote(text: string, speaker: string) {
 
 function getWellbeingNote(text: string) {
   if (/\b(feeling|felt)\s+better\b/i.test(text)) {
-    return 'Patient was feeling better'
+    return 'The patient seemed to be feeling better during the conversation'
   }
 
   if (/\b(water|bottle)\b/i.test(text)) {
-    return 'Water was left nearby'
+    return 'A water bottle or drink was left nearby for the patient'
   }
 
   if (/\b(photo|album|family photos)\b/i.test(text)) {
-    return 'They looked at family photos'
+    return 'They looked at family photos together, which may help reassure the patient'
   }
 
   return ''
@@ -183,16 +187,24 @@ function lightweightSummary(transcript: string) {
   ]).slice(0, 3)
 
   if (notes.length > 0) {
-    return finishSentence(trimSummary(notes.join('; ')))
+    const detailSentence = finishSentence(notes.join('; '))
+    const contextSentence = speaker
+      ? `${speaker} spoke with the patient and shared practical reassurance and care context from the visit.`
+      : 'The conversation included practical reassurance and care context from the visit.'
+
+    return finishSentence(trimSummary(`${detailSentence} ${contextSentence}`))
   }
 
-  const compact = cleaned
+  const compact = sentenceCase(cleaned
     .replace(/\b(?:it'?s|it is|this is)\s+me,?\s+[a-z][a-z'-]+\.?/i, '')
     .replace(/\byou\b/gi, 'the patient')
     .split(/(?<=[.!?])\s+/)[0]
-    .slice(0, 260)
+    .slice(0, 300))
+  const speakerContext = speaker
+    ? `${speaker} spoke with the patient and gave a short update from the visit.`
+    : 'The speaker gave the patient a short update from the visit.'
 
-  return finishSentence(sentenceCase(compact))
+  return finishSentence(trimSummary(`${speakerContext} ${compact}`))
 }
 
 export function warmConversationSummarizer() {
@@ -210,7 +222,7 @@ export async function summarizeConversation(transcript: string) {
     })
     const summary = response.summary?.trim()
 
-    if (summary) {
+    if (summary && (wordCount(summary) >= 12 || wordCount(transcript) < 12)) {
       return finishSentence(trimSummary(summary))
     }
   } catch {
