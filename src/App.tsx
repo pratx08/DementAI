@@ -1460,18 +1460,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     }
 
     setIsSavingPhotos(true)
-    setStatus('Validating face samples...')
+    setStatus('Creating face descriptors...')
 
     try {
-      const faceDetection = await import('./services/mediaPipeFaceDetection')
-      await faceDetection.loadMediaPipeImageFaceDetector()
-
-      for (const file of extraImageFiles) {
-        const face = await faceDetection.detectFaceInImage(file)
-        if (!face) throw new Error('Could not find a clear face in one of the photos.')
-      }
-
-      setStatus('Creating face descriptors...')
       await loadFaceModels()
       const newDescriptors = await Promise.all(
         extraImageFiles.map((file) => createDescriptorFromImage(file)),
@@ -1512,21 +1503,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     }
 
     setIsSaving(true)
-    setStatus('Reading face samples in this browser...')
+    setStatus('Creating recognition profile...')
 
     try {
-      const faceDetection = await import('./services/mediaPipeFaceDetection')
-      await faceDetection.loadMediaPipeImageFaceDetector()
-
-      for (const file of imageFiles) {
-        const mediaPipeFace = await faceDetection.detectFaceInImage(file)
-
-        if (!mediaPipeFace) {
-          throw new Error('MediaPipe could not find a clear face in one sample.')
-        }
-      }
-
-      setStatus('Creating local face descriptors...')
       await loadFaceModels()
       const descriptors = await Promise.all(
         imageFiles.map((file) => createDescriptorFromImage(file)),
