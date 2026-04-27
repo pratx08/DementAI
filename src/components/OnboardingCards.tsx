@@ -192,52 +192,52 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
         <span className="cd-company-tag" style={{ color: company.accent }}>{company.tag}</span>
       </div>
 
-      {/* Image placeholder */}
-      <div className="cd-media-block">
-        <img
-          className="cd-image"
-          src={company.imageSrc}
-          alt={`${company.name} cover`}
-          onLoad={() => setImageReady(true)}
-          onError={() => setImageReady(false)}
-        />
-        {!imageReady && (
-          <div className="cd-image-placeholder" aria-hidden>
-          <svg viewBox="0 0 48 48" fill="none">
-            <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
-            <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M4 30l10-8 8 6 6-4 16 10" stroke="currentColor" strokeWidth="1.8"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span>Add image to<br /><code>public/competitors/{company.id}-cover.jpg</code></span>
-          </div>
-        )}
-      </div>
+      <div className="cd-media-grid">
+        <div className="cd-media-block">
+          <img
+            className="cd-image"
+            src={company.imageSrc}
+            alt={`${company.name} cover`}
+            onLoad={() => setImageReady(true)}
+            onError={() => setImageReady(false)}
+          />
+          {!imageReady && (
+            <div className="cd-image-placeholder" aria-hidden>
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M4 30l10-8 8 6 6-4 16 10" stroke="currentColor" strokeWidth="1.8"
+                strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>Add image to<br /><code>public/competitors/{company.id}-cover.jpg</code></span>
+            </div>
+          )}
+        </div>
 
-      {/* Video placeholder */}
-      <div className="cd-media-block cd-media-block--video">
-        <video
-          className="cd-video"
-          src={company.videoSrc}
-          autoPlay
-          muted
-          loop
-          controls
-          playsInline
-          preload="auto"
-          onLoadedData={() => setVideoReady(true)}
-          onError={() => setVideoReady(false)}
-        />
-        {!videoReady && (
-          <div className="cd-video-placeholder" aria-hidden>
-          <svg viewBox="0 0 48 48" fill="none">
-            <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M20 18l12 6-12 6V18Z" stroke="currentColor" strokeWidth="1.8"
-              strokeLinejoin="round" />
-          </svg>
-          <span>Add video to<br /><code>public/competitors/{company.id}-video.mp4</code></span>
-          </div>
-        )}
+        <div className="cd-media-block cd-media-block--video">
+          <video
+            className="cd-video"
+            src={company.videoSrc}
+            autoPlay
+            muted
+            loop
+            controls
+            playsInline
+            preload="auto"
+            onLoadedData={() => setVideoReady(true)}
+            onError={() => setVideoReady(false)}
+          />
+          {!videoReady && (
+            <div className="cd-video-placeholder" aria-hidden>
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M20 18l12 6-12 6V18Z" stroke="currentColor" strokeWidth="1.8"
+                strokeLinejoin="round" />
+            </svg>
+            <span>Add video to<br /><code>public/competitors/{company.id}-video.mp4</code></span>
+            </div>
+          )}
+        </div>
       </div>
       </motion.article>
     </motion.div>
