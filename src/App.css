@@ -2819,7 +2819,7 @@ body {
 /* Media blocks */
 .cd-media-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, 0.82fr) minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
 }
@@ -2860,7 +2860,6 @@ body {
   }
 
   .cd-media-grid {
-    grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 0.72fr) minmax(0, 1fr);
     gap: 10px;
   }
