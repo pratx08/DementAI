@@ -121,10 +121,16 @@ const SLIDE = {
   exit:  (dir: number) => ({ x: dir > 0 ? '-65%' : '65%', opacity: 0, scale: 0.95 }),
 }
 
-const DETAIL_VARIANTS = {
-  enter:  { y: '100%', opacity: 0 },
-  center: { y: 0,      opacity: 1 },
-  exit:   { y: '100%', opacity: 0 },
+const MODAL_BACKDROP = {
+  enter:  { opacity: 0 },
+  center: { opacity: 1 },
+  exit:   { opacity: 0 },
+}
+
+const MODAL_PANEL = {
+  enter:  { y: 28, opacity: 0, scale: 0.96 },
+  center: { y: 0,  opacity: 1, scale: 1 },
+  exit:   { y: 20, opacity: 0, scale: 0.97 },
 }
 
 // ─── Company detail view ────────────────────────────────────────
@@ -134,21 +140,32 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
 
   return (
     <motion.div
-      className="cd-shell"
-      variants={DETAIL_VARIANTS}
+      className="cd-backdrop"
+      variants={MODAL_BACKDROP}
       initial="enter"
       animate="center"
       exit="exit"
-      transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
+      onClick={onBack}
+      role="presentation"
     >
+      <motion.article
+        className="cd-shell"
+        variants={MODAL_PANEL}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`company-title-${company.id}`}
+      >
       {/* Top bar: back + source link */}
       <div className="cd-topbar">
-        <button className="cd-back" onClick={onBack} aria-label="Back">
+        <button className="cd-back" onClick={onBack} aria-label="Close company details">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" strokeWidth="2"
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span>Back</span>
+          <span>Close</span>
         </button>
 
         <a
@@ -169,7 +186,9 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
 
       {/* Company name */}
       <div className="cd-name-row">
-        <span className="cd-company-name">{company.name}</span>
+        <span className="cd-company-name" id={`company-title-${company.id}`}>
+          {company.name}
+        </span>
         <span className="cd-company-tag" style={{ color: company.accent }}>{company.tag}</span>
       </div>
 
@@ -200,8 +219,12 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
         <video
           className="cd-video"
           src={company.videoSrc}
+          autoPlay
+          muted
+          loop
           controls
           playsInline
+          preload="auto"
           onLoadedData={() => setVideoReady(true)}
           onError={() => setVideoReady(false)}
         />
@@ -216,6 +239,7 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
           </div>
         )}
       </div>
+      </motion.article>
     </motion.div>
   )
 }
@@ -266,15 +290,6 @@ export function OnboardingCards({ onDone }: { onDone: () => void }) {
       {/* ── Card stage ── */}
       <div className="ob-stage">
         <AnimatePresence mode="wait" custom={dir}>
-          {activeCompany ? (
-            /* Company detail overlay */
-            <CompanyDetail
-              key={`detail-${activeCompany.id}`}
-              company={activeCompany}
-              onBack={() => setActiveCompany(null)}
-            />
-          ) : (
-            /* Normal pitch card */
             <motion.div
               key={index}
               className="ob-card"
@@ -328,7 +343,6 @@ export function OnboardingCards({ onDone }: { onDone: () => void }) {
                 </div>
               </div>
             </motion.div>
-          )}
         </AnimatePresence>
       </div>
 
@@ -371,6 +385,16 @@ export function OnboardingCards({ onDone }: { onDone: () => void }) {
               )}
             </motion.button>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeCompany && (
+          <CompanyDetail
+            key={`detail-${activeCompany.id}`}
+            company={activeCompany}
+            onBack={() => setActiveCompany(null)}
+          />
         )}
       </AnimatePresence>
     </div>
