@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
 import { LandingPage } from './components/LandingPage'
-import { OnboardingCards, VALIDATION_CARD } from './components/OnboardingCards'
+import { GROWTH_RISK_CARD, OnboardingCards, VALIDATION_CARD } from './components/OnboardingCards'
 import { useCamera } from './hooks/useCamera'
 import {
   clearKnownPeople,
@@ -264,14 +264,19 @@ function LoginScreen({
   onSelectRole: (role: UserRole) => void
 }) {
   const [showAbout, setShowAbout] = useState(false)
-  const card = VALIDATION_CARD
+  const [aboutIndex, setAboutIndex] = useState(0)
+  const aboutCards = [VALIDATION_CARD, GROWTH_RISK_CARD]
+  const card = aboutCards[aboutIndex]
 
   return (
     <main className="login-shell">
       <button
         className="about-toggle"
         type="button"
-        onClick={() => setShowAbout(true)}
+        onClick={() => {
+          setAboutIndex(0)
+          setShowAbout(true)
+        }}
       >
         About
       </button>
@@ -357,7 +362,36 @@ function LoginScreen({
                     ))}
                   </ul>
                 )}
+
+                {card.columns && (
+                  <div className="ob-column-grid about-column-grid">
+                    {card.columns.map((column) => (
+                      <section className="ob-column" key={column.title}>
+                        <h3>{column.title}</h3>
+                        <ul>
+                          {column.items.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                )}
               </div>
+            </div>
+
+            <div className="about-nav-row" aria-label="About cards">
+              {aboutCards.map((aboutCard, index) => (
+                <button
+                  className="about-nav-btn"
+                  type="button"
+                  key={aboutCard.eyebrow}
+                  onClick={() => setAboutIndex(index)}
+                  disabled={index === aboutIndex}
+                >
+                  {aboutCard.eyebrow}
+                </button>
+              ))}
             </div>
 
             <button

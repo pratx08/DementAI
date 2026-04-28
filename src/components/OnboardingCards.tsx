@@ -181,9 +181,7 @@ export const GROWTH_RISK_CARD: Card = {
 }
 
 export const CARDS: Card[] = [
-  ...BASE_CARDS,
-  VALIDATION_CARD,
-  GROWTH_RISK_CARD,
+  ...BASE_CARDS.slice(0, 2),
 ]
 
 // ─── Slide variants ─────────────────────────────────────────────
@@ -209,6 +207,7 @@ const MODAL_PANEL = {
 export function CompanyDetail({ company, onBack }: { company: Company; onBack: () => void }) {
   const [imageReady, setImageReady] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
+  const showVideo = company.id !== 'careyaya'
 
   return (
     <motion.div
@@ -264,7 +263,7 @@ export function CompanyDetail({ company, onBack }: { company: Company; onBack: (
         <span className="cd-company-tag" style={{ color: company.accent }}>{company.tag}</span>
       </div>
 
-      <div className="cd-media-grid">
+      <div className={`cd-media-grid ${!showVideo ? 'cd-media-grid--single' : ''}`}>
         <div className="cd-media-block">
           <img
             className="cd-image"
@@ -286,30 +285,32 @@ export function CompanyDetail({ company, onBack }: { company: Company; onBack: (
           )}
         </div>
 
-        <div className="cd-media-block cd-media-block--video">
-          <video
-            className="cd-video"
-            src={company.videoSrc}
-            autoPlay
-            muted
-            loop
-            controls
-            playsInline
-            preload="auto"
-            onLoadedData={() => setVideoReady(true)}
-            onError={() => setVideoReady(false)}
-          />
-          {!videoReady && (
-            <div className="cd-video-placeholder" aria-hidden>
-            <svg viewBox="0 0 48 48" fill="none">
-              <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M20 18l12 6-12 6V18Z" stroke="currentColor" strokeWidth="1.8"
-                strokeLinejoin="round" />
-            </svg>
-            <span>Add video to<br /><code>public/competitors/{company.id}-video.mp4</code></span>
-            </div>
-          )}
-        </div>
+        {showVideo && (
+          <div className="cd-media-block cd-media-block--video">
+            <video
+              className="cd-video"
+              src={company.videoSrc}
+              autoPlay
+              muted
+              loop
+              controls
+              playsInline
+              preload="auto"
+              onLoadedData={() => setVideoReady(true)}
+              onError={() => setVideoReady(false)}
+            />
+            {!videoReady && (
+              <div className="cd-video-placeholder" aria-hidden>
+              <svg viewBox="0 0 48 48" fill="none">
+                <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M20 18l12 6-12 6V18Z" stroke="currentColor" strokeWidth="1.8"
+                  strokeLinejoin="round" />
+              </svg>
+              <span>Add video to<br /><code>public/competitors/{company.id}-video.mp4</code></span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       </motion.article>
     </motion.div>

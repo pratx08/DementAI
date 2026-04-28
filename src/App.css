@@ -173,6 +173,10 @@ button {
   overflow-y: hidden;
 }
 
+.about-column-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
 .login-panel {
   width: min(620px, 100%);
   padding: clamp(24px, 5vw, 42px);
@@ -3047,6 +3051,10 @@ body {
   grid-template-rows: minmax(0, 0.56fr) minmax(0, 1.44fr);
   gap: 12px;
   min-height: 0;
+}
+
+.cd-media-grid--single {
+  grid-template-rows: 1fr;
 }
 
 .cd-media-block {
