@@ -293,12 +293,12 @@ function LoginScreen({
 
       {showAbout && (
         <div
-          className="about-backdrop about-backdrop-fullscreen"
+          className="about-backdrop"
           role="presentation"
           onClick={() => setShowAbout(false)}
         >
           <section
-            className="ob-card about-card about-card-fullscreen"
+            className="ob-card about-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="about-title"

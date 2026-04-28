@@ -157,25 +157,13 @@ button {
   cursor: not-allowed;
 }
 
-.about-backdrop-fullscreen {
-  z-index: 1000;
-  background: #031009;
+.about-card .ob-card-grid {
+  overflow: hidden;
 }
 
-.about-card-fullscreen {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  margin: 0 !important;
-  border: none !important;
-  border-radius: 0 !important;
-  background: #031009 !important;
-}
-
-.about-card-fullscreen .ob-card-grid {
-  height: 100vh;
-  padding: 40px;
+.about-card .ob-card-side {
+  max-height: 100%;
+  overflow-y: hidden;
 }
 
 .login-panel {
