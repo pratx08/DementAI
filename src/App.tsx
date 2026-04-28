@@ -274,7 +274,7 @@ function LoginScreen({
         className="about-toggle"
         type="button"
         onClick={() => {
-          setAboutIndex(0)
+          setAboutIndex(3)
           setShowAbout(true)
         }}
       >

@@ -127,15 +127,15 @@ export const CARDS: Card[] = [
     bullets: [
       { 
         label: 'Neurologist', 
-        detail: <><mark>Not for older or severe dementia</mark>; best scope is <mark>early and mid-stage dementia</mark>.</> 
+        detail: 'Not for older or severe dementia; best scope is early and mid-stage dementia.' 
       },
       { 
         label: 'Psychology', 
-        detail: <><mark>Just two patient actions</mark>; kept the experience simple by removing extra options.</> 
+        detail: 'Just two patient actions; kept the experience simple by removing extra options.' 
       },
       { 
         label: 'Developers', 
-        detail: <><mark>Privacy-aware SOS flow</mark> replaced the 30-second video recording for simplicity.</> 
+        detail: 'Privacy-aware SOS flow replaced the 30-second video recording for simplicity.' 
       },
     ],
   },
