@@ -309,12 +309,12 @@ function LoginScreen({
             aria-labelledby="about-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="ob-card-grid about-card-grid">
-              <div className="ob-card-copy">
+            {card.columns ? (
+              <div className="about-growth-view">
                 <div className="ob-header-row">
-                  <span className="ob-eyebrow" style={{ color: card.accent }}>
-                    {card.eyebrow}
-                  </span>
+                  <h2 className="ob-title" id="about-title">
+                    Growth Strategy & Risks
+                  </h2>
                   <button
                     className="about-close"
                     type="button"
@@ -325,64 +325,80 @@ function LoginScreen({
                   </button>
                 </div>
 
-                <div className="ob-divider" style={{ background: card.accent }} />
-                {card.title && (
-                  <h2 className="ob-title" id="about-title">
-                    {card.title}
-                  </h2>
-                )}
-                {card.body && (
-                  <p className="ob-body">
-                    {card.body}
-                  </p>
-                )}
+                <div className="ob-column-grid about-column-grid">
+                  {card.columns.map((column) => (
+                    <section className="ob-column" key={column.title}>
+                      <h3>{column.title}</h3>
+                      <ul>
+                        {column.items.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
               </div>
-
-              <div className="ob-card-side">
-                <div className="ob-side-top">
-                  <div className="ob-icon-panel" style={{ color: card.accent }}>
-                    {card.icon}
-                  </div>
-
-                  <div className="ob-stat-block">
-                    <span className="ob-stat-number" style={{ color: card.accent }}>{card.stat}</span>
-                    <span className="ob-stat-label">
-                      {card.statLabel}
+            ) : (
+              <div className="ob-card-grid about-card-grid">
+                <div className="ob-card-copy">
+                  <div className="ob-header-row">
+                    <span className="ob-eyebrow" style={{ color: card.accent }}>
+                      {card.eyebrow}
                     </span>
+                    <button
+                      className="about-close"
+                      type="button"
+                      aria-label="Close about card"
+                      onClick={() => setShowAbout(false)}
+                    >
+                      Close
+                    </button>
                   </div>
+
+                  <div className="ob-divider" style={{ background: card.accent }} />
+                  {card.title && (
+                    <h2 className="ob-title" id="about-title">
+                      {card.title}
+                    </h2>
+                  )}
+                  {card.body && (
+                    <p className="ob-body">
+                      {card.body}
+                    </p>
+                  )}
                 </div>
 
-                {card.bullets && (
-                  <ul className="ob-bullets about-bullets">
-                    {card.bullets.map((bullet, i) => (
-                      <li key={i} className="ob-bullet">
-                        <span className="ob-bullet-label" style={{ color: card.accent }}>
-                          {bullet.label}
-                        </span>
-                        <span className="ob-bullet-detail">
-                          {bullet.detail}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <div className="ob-card-side">
+                  <div className="ob-side-top">
+                    <div className="ob-icon-panel" style={{ color: card.accent }}>
+                      {card.icon}
+                    </div>
 
-                {card.columns && (
-                  <div className="ob-column-grid about-column-grid">
-                    {card.columns.map((column) => (
-                      <section className="ob-column" key={column.title}>
-                        <h3>{column.title}</h3>
-                        <ul>
-                          {column.items.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
-                      </section>
-                    ))}
+                    <div className="ob-stat-block">
+                      <span className="ob-stat-number" style={{ color: card.accent }}>{card.stat}</span>
+                      <span className="ob-stat-label">
+                        {card.statLabel}
+                      </span>
+                    </div>
                   </div>
-                )}
+
+                  {card.bullets && (
+                    <ul className="ob-bullets about-bullets">
+                      {card.bullets.map((bullet, i) => (
+                        <li key={i} className="ob-bullet">
+                          <span className="ob-bullet-label" style={{ color: card.accent }}>
+                            {bullet.label}
+                          </span>
+                          <span className="ob-bullet-detail">
+                            {bullet.detail}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <button
               className="about-nav-arrow"
@@ -390,17 +406,7 @@ function LoginScreen({
               aria-label={aboutIndex === 0 ? 'View growth strategy and risks' : 'Back to validation'}
               onClick={() => setAboutIndex((index) => (index === 0 ? 1 : 0))}
             >
-              {aboutIndex === 0 ? (
-                <>
-                  <span>Growth Strategy & Risks</span>
-                  <span aria-hidden>→</span>
-                </>
-              ) : (
-                <>
-                  <span aria-hidden>←</span>
-                  <span>Validation</span>
-                </>
-              )}
+              <span aria-hidden>{aboutIndex === 0 ? '→' : '←'}</span>
             </button>
 
             <button
