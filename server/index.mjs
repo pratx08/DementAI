@@ -253,9 +253,11 @@ app.post('/api/summarize', async (req, res) => {
     'Summarize this dementia-care conversation for a face-recognition memory card.',
     'Do not copy the transcript verbatim, but preserve the concrete details.',
     'Include useful care context: who spoke if clear, relationship context, medication, visit plans, appointments, emotional state, reassurance given, and objects left nearby.',
-    'Write 2 complete, natural sentences, not a fragment or title.',
-    'Each sentence should be useful to the patient and caregiver.',
-    'Aim for 35 to 70 words total.',
+    'Write 2 to 3 complete, natural sentences, not a fragment, title, label, name, or relationship only.',
+    'Each sentence should be useful to the patient and caregiver as a memory cue on a face card.',
+    'For short casual conversations, still explain what happened, what was mentioned, and any follow-up invitation or plan.',
+    'Aim for 45 to 90 words total.',
+    'Example style: "Sarah spoke with the patient about yesterday\'s walk and remembered the beautiful trees, flowers, and fresh air. She also suggested catching up for another walk someday, which can be used as a warm topic for the next conversation."',
     'Return plain text only.',
     '',
     `Conversation: ${transcript}`,
@@ -266,8 +268,8 @@ app.post('/api/summarize', async (req, res) => {
       geminiSummaryModel,
       [{ text: prompt }],
       {
-        temperature: 0.2,
-        maxOutputTokens: 180,
+        temperature: 0.25,
+        maxOutputTokens: 260,
       },
     )
     const summary = extractGeminiText(data)

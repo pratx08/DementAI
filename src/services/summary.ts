@@ -3,7 +3,8 @@ import { apiPost } from './apiClient'
 export const DEFAULT_SUMMARY =
   'Conversation summary will appear here after the next visit.'
 
-const MAX_SUMMARY_CHARS = 520
+const MAX_SUMMARY_CHARS = 680
+const MIN_USEFUL_SUMMARY_WORDS = 18
 const TRIVIAL_WORDS = new Set([
   'no',
   'yes',
@@ -65,6 +66,15 @@ function finishSentence(text: string) {
 
 function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+function firstMeaningfulSentence(text: string) {
+  const cleaned = normalizeText(text)
+
+  return cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .find((sentence) => wordCount(sentence) >= 5) ?? cleaned
 }
 
 function extractSpeaker(text: string) {
@@ -132,6 +142,10 @@ function getVisitNote(text: string, speaker: string) {
 }
 
 function getWellbeingNote(text: string) {
+  if (/\b(beautiful|nice|lovely|fresh air|trees?|flowers?|outside|park)\b/i.test(text)) {
+    return 'The conversation included a positive outdoor memory, with details about trees, flowers, and fresh air'
+  }
+
   if (/\b(feeling|felt)\s+better\b/i.test(text)) {
     return 'The patient seemed to be feeling better during the conversation'
   }
@@ -180,6 +194,7 @@ function lightweightSummary(transcript: string) {
   }
 
   const speaker = extractSpeaker(cleaned)
+  const meaningfulSentence = firstMeaningfulSentence(cleaned)
   const notes = dedupe([
     getMedicineNote(cleaned),
     getVisitNote(cleaned, speaker),
@@ -189,22 +204,23 @@ function lightweightSummary(transcript: string) {
   if (notes.length > 0) {
     const detailSentence = finishSentence(notes.join('; '))
     const contextSentence = speaker
-      ? `${speaker} spoke with the patient and shared practical reassurance and care context from the visit.`
-      : 'The conversation included practical reassurance and care context from the visit.'
+      ? `${speaker} spoke with the patient and shared practical reassurance, including: ${meaningfulSentence}.`
+      : `The speaker shared a helpful personal update for the memory card: ${meaningfulSentence}.`
 
     return finishSentence(trimSummary(`${detailSentence} ${contextSentence}`))
   }
 
-  const compact = sentenceCase(cleaned
+  const compact = sentenceCase(meaningfulSentence
     .replace(/\b(?:it'?s|it is|this is)\s+me,?\s+[a-z][a-z'-]+\.?/i, '')
     .replace(/\byou\b/gi, 'the patient')
-    .split(/(?<=[.!?])\s+/)[0]
-    .slice(0, 300))
+    .slice(0, 360))
   const speakerContext = speaker
-    ? `${speaker} spoke with the patient and gave a short update from the visit.`
-    : 'The speaker gave the patient a short update from the visit.'
+    ? `${speaker} spoke with the patient and gave a clear update from the visit.`
+    : 'The speaker gave the patient a clear update from the visit.'
+  const memoryContext =
+    'This should be shown as a recent memory cue so the patient can reconnect with the topic in the next conversation.'
 
-  return finishSentence(trimSummary(`${speakerContext} ${compact}`))
+  return finishSentence(trimSummary(`${speakerContext} ${compact}. ${memoryContext}`))
 }
 
 export function warmConversationSummarizer() {
@@ -222,7 +238,7 @@ export async function summarizeConversation(transcript: string) {
     })
     const summary = response.summary?.trim()
 
-    if (summary && (wordCount(summary) >= 12 || wordCount(transcript) < 12)) {
+    if (summary && wordCount(summary) >= MIN_USEFUL_SUMMARY_WORDS) {
       return finishSentence(trimSummary(summary))
     }
   } catch {
