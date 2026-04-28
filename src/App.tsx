@@ -13,7 +13,6 @@ import {
   Calendar,
   FileText,
   History,
-  Layout,
   LogOut,
   Mic,
   MicOff,
@@ -1981,20 +1980,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     { id: 'daily-log', label: 'History', icon: <History size={18} />, description: 'Activity feed and caretaker notes' },
   ]
 
-  const activeTabInfo = tabs.find(t => t.id === activeTab)
-
   return (
     <main className="caretaker-shell">
       <nav className="caretaker-header">
-        <div className="header-brand">
-          <div className="brand-icon">
-            <Layout size={20} />
-          </div>
-          <div>
-            <h1>Caretaker Portal</h1>
-            <p>DementAI Clinical Assistant</p>
-          </div>
-        </div>
         <div className="header-actions">
           <button className="logout-btn" type="button" onClick={onLogout}>
             <LogOut size={16} />
@@ -2023,16 +2011,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         </aside>
 
         <section className="caretaker-main">
-          <header className="main-header">
-            <div className="header-title-row">
-              <div className="header-icon-box">{activeTabInfo?.icon}</div>
-              <div>
-                <h2>{activeTabInfo?.label}</h2>
-                <p>{activeTabInfo?.description}</p>
-              </div>
-            </div>
-          </header>
-
           <div className="main-content">
 
           {/* ── Contacts ── */}
