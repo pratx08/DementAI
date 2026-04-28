@@ -19,7 +19,7 @@ export type Company = {
 export const COMPANIES: Company[] = [
   {
     id: 'guardian',
-    name: 'AI Smart Glasses',
+    name: 'CrossSense',
     tag: '£1M Prize · Dementia Tech',
     sourceLabel: 'The Guardian',
     sourceUrl: 'https://www.theguardian.com/society/2026/mar/18/ai-smart-glasses-1m-prize-technology-dementia',

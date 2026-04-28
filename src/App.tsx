@@ -1309,6 +1309,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
             aria-label={micEnabled ? 'Pause microphone' : 'Start microphone'}
           >
             {micEnabled ? <Mic size={22} /> : <MicOff size={22} />}
+            <span>{micEnabled ? 'Listening' : 'Talk'}</span>
           </button>
           <button
             className="danger-action"
