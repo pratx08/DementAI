@@ -2406,13 +2406,14 @@ body {
 
 .ob-shell {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
   min-height: 100svh;
-  background: #050706;
+  background: #000;
   overflow: hidden;
   padding:
     max(24px, env(safe-area-inset-top))
@@ -2422,16 +2423,46 @@ body {
   gap: 28px;
 }
 
+.ob-shell::before {
+  content: "";
+  position: absolute;
+  inset: -28%;
+  z-index: -2;
+  background:
+    linear-gradient(118deg, transparent 0 18%, rgba(37, 99, 235, 0.42) 30%, transparent 43%),
+    linear-gradient(42deg, transparent 0 24%, rgba(16, 185, 129, 0.34) 39%, transparent 54%),
+    linear-gradient(152deg, transparent 0 48%, rgba(245, 158, 11, 0.26) 62%, transparent 76%),
+    #000;
+  filter: blur(52px);
+  opacity: 0.92;
+  transform: rotate(-6deg);
+}
+
+.ob-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.58)),
+    rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+}
+
 .ob-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 70% 50% at 50% 30%, rgba(54, 179, 126, 0.08), transparent 65%);
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255, 255, 255, 0.08), transparent 65%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.46), transparent 32%, transparent 68%, rgba(0, 0, 0, 0.46));
   pointer-events: none;
 }
 
 /* Stage that holds the animated card */
 .ob-stage {
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 420px;
   flex: 1;
@@ -2529,6 +2560,7 @@ body {
 /* Navigation row */
 .ob-nav {
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 420px;
   display: flex;
