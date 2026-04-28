@@ -1,0 +1,10 @@
+[
+  {
+    "id": "person-demo",
+    "name": "Demo Person",
+    "relation": "Family",
+    "group": "Family",
+    "lastConversationSummary": "This placeholder profile shows the card structure. Add real face descriptors from enrolled photos or your database to enable live recognition.",
+    "descriptors": []
+  }
+]
