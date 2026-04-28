@@ -7,7 +7,6 @@ import WebSpeechRecognition, {
 import {
   AlertTriangle,
   ArrowLeft,
-  Flag,
   Mic,
   MicOff,
   Upload,
@@ -34,7 +33,6 @@ import {
   type DashboardState,
   type DailyLogEntry,
   type ReminderItem,
-  type UnknownQueueItem,
 } from './services/dashboardData'
 import {
   DEFAULT_SUMMARY,
@@ -91,7 +89,6 @@ type CaretakerTab =
   | 'safe-zone'
   | 'contacts'
   | 'sos-alerts'
-  | 'unknown-queue'
   | 'cognitive-report'
 
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
@@ -206,11 +203,6 @@ function formatShortDate(value: string) {
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-function inferHeardName(transcript: string) {
-  const match = transcript.match(/\b([A-Z][a-z]{2,})\b/)
-  return match?.[1] ?? 'No clear name'
 }
 
 function inferSentiment(transcript: string): DailyLogEntry['sentiment'] {
@@ -1181,28 +1173,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
   }, [knownPeople, videoEl])
 
-  function handlePatientFlag() {
-    const transcript = captionText.trim()
-    const heardName = inferHeardName(transcript)
-
-    updateStoredDashboardState((current) => ({
-      ...current,
-      unknownQueue: [
-        {
-          id: createLocalId('unknown'),
-          flaggedAt: new Date().toISOString(),
-          heardName,
-          snippet: transcript || 'Flagged from the patient view without spoken context yet.',
-          emotionalState: recognized ? 'Neutral' : 'Uncertain',
-          status: 'pending',
-        },
-        ...current.unknownQueue,
-      ],
-    }))
-
-    setMicStatus('Flag sent to caretaker.')
-  }
-
   function handlePatientSos() {
     const transcript = captionText.trim()
     const location = 'Patient camera view'
@@ -1342,10 +1312,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
             <AlertTriangle size={23} />
             <span>SOS</span>
           </button>
-          <button type="button" aria-label="Flag person" onClick={handlePatientFlag}>
-            <Flag size={22} />
-            <span>Flag</span>
-          </button>
         </nav>
 
         {captionText && (
@@ -1431,7 +1397,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
         setVisitorPersonId(loadedPeople[0]?.id ?? '')
         didLoadRef.current = true
       } catch {
-        // People/dashboard already initialized from localStorage — just flag sync failure.
+        // People/dashboard already initialized from localStorage; show sync failure.
         setStatus('Could not sync with server. Showing locally saved data.')
         didLoadRef.current = true
       }
@@ -1849,14 +1815,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setStatus('Daily note saved.')
   }
 
-  function handleQueueToContact(item: UnknownQueueItem) {
-    setName(item.heardName === 'No clear name' ? '' : item.heardName)
-    setRelation('Visitor')
-    setSummary(item.snippet)
-    setActiveTab('contacts')
-    setStatus('Unknown visitor details moved into the contact form for review.')
-  }
-
   function handleScheduleVisitor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -2009,7 +1967,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     { id: 'safe-zone', label: 'Safezone' },
     { id: 'contacts', label: 'Contacts' },
     { id: 'sos-alerts', label: 'SOS' },
-    { id: 'unknown-queue', label: 'Unknown Queue' },
     { id: 'cognitive-report', label: 'Cognitive' },
   ]
 
@@ -2324,41 +2281,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                 <button type="submit">Save note</button>
               </form>
             </div>
-          )}
-
-          {/* ── Unknown Queue ── */}
-          {activeTab === 'unknown-queue' && (
-            <article className="panel-card">
-              <div className="panel-head">
-                <h2>Unknown visitors</h2>
-                <p>Faces the patient flagged but couldn't identify. Review and take action.</p>
-              </div>
-              <div className="stack-list">
-                {dashboard.unknownQueue.length === 0 ? (
-                  <p className="empty-people">No flagged visitors yet.</p>
-                ) : (
-                  dashboard.unknownQueue.map((item) => (
-                    <div className="list-card" key={item.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <strong>{item.heardName}</strong>
-                        <span className={`badge badge--${item.status}`}>{item.status}</span>
-                      </div>
-                      <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(item.flaggedAt)} · Emotional state: {item.emotionalState}</span>
-                      <p>{item.snippet}</p>
-                      <div className="inline-actions">
-                        <button type="button" onClick={() => handleQueueToContact(item)}>Add as contact</button>
-                        <button type="button" onClick={() => updateDashboard((cur) => ({ ...cur, unknownQueue: cur.unknownQueue.map((e) => e.id === item.id ? { ...e, status: 'follow-up' } : e) }))}>
-                          Follow-up
-                        </button>
-                        <button type="button" onClick={() => updateDashboard((cur) => ({ ...cur, unknownQueue: cur.unknownQueue.map((e) => e.id === item.id ? { ...e, status: 'dismissed' } : e) }))}>
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </article>
           )}
 
           {/* ── Visitor Schedule ── */}
