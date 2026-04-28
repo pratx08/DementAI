@@ -14,6 +14,12 @@
   box-sizing: border-box;
 }
 
+@keyframes cardGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 html,
 body,
 #app {
@@ -219,7 +225,9 @@ button {
   padding: clamp(24px, 5vw, 42px);
   border: 1px solid rgba(211, 255, 224, 0.36);
   border-radius: 8px;
-  background: rgba(7, 12, 10, 0.58);
+  background: linear-gradient(-45deg, #000000, #0a1812, #120a18, #0a1218, #000000);
+  background-size: 400% 400%;
+  animation: cardGradient 15s ease infinite;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(18px);
 }
@@ -791,7 +799,9 @@ button {
   border: 1px solid rgba(230, 255, 238, 0.28);
   border-radius: 8px;
   color: rgba(248, 255, 250, 0.86);
-  background: rgba(7, 12, 10, 0.58);
+  background: linear-gradient(-45deg, #000000, #0a1812, #120a18, #0a1218, #000000);
+  background-size: 400% 400%;
+  animation: cardGradient 15s ease infinite;
   text-align: center;
   backdrop-filter: blur(18px);
   transform: translate(-50%, -50%);
@@ -818,7 +828,9 @@ button {
   overflow: hidden;
   border: 1px solid rgba(230, 255, 238, 0.28);
   border-radius: 8px;
-  background: rgba(7, 12, 10, 0.5);
+  background: linear-gradient(-45deg, #000000, #0a1812, #120a18, #0a1218, #000000);
+  background-size: 400% 400%;
+  animation: cardGradient 15s ease infinite;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
 }
@@ -2488,7 +2500,9 @@ button[type="submit"]:hover, .save-person:hover {
   padding: 18px 20px;
   border: 1px solid rgba(230, 255, 238, 0.3);
   border-radius: 14px;
-  background: rgba(5, 12, 9, 0.8);
+  background: linear-gradient(-45deg, #000000, #0a1812, #120a18, #0a1218, #000000);
+  background-size: 400% 400%;
+  animation: cardGradient 15s ease infinite;
   backdrop-filter: blur(20px);
   transform: translateX(-50%);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
@@ -2866,7 +2880,9 @@ button[type="submit"]:hover, .save-person:hover {
   display: flex;
   align-items: stretch;
   padding: clamp(28px, 6vw, 44px);
-  background: #0d0d0d;
+  background: linear-gradient(-45deg, #000000, #0a1812, #120a18, #0a1218, #000000);
+  background-size: 400% 400%;
+  animation: cardGradient 15s ease infinite;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 28px;
   box-shadow:
@@ -3245,7 +3261,9 @@ button[type="submit"]:hover, .save-person:hover {
   gap: 12px;
   width: min(980px, 100%);
   height: min(88svh, 720px);
-  background: #0d0d0d;
+  background: linear-gradient(-45deg, #000000, #0a1812, #120a18, #0a1218, #000000);
+  background-size: 400% 400%;
+  animation: cardGradient 15s ease infinite;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 28px;
   padding: clamp(18px, 4.5vw, 28px);
