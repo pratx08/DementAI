@@ -129,6 +129,34 @@ button {
   font-weight: 800;
 }
 
+.about-nav-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.about-nav-btn {
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #f8fff9;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.about-nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.about-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .login-panel {
   width: min(620px, 100%);
   padding: clamp(24px, 5vw, 42px);

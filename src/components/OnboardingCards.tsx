@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const assetPath = (path: string) =>
   `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 
-// ─── Company detail data ────────────────────────────────────────
-type Company = {
+export type Company = {
   id: string
   name: string
   tag: string
@@ -17,7 +16,7 @@ type Company = {
   accent: string
 }
 
-const COMPANIES: Company[] = [
+export const COMPANIES: Company[] = [
   {
     id: 'guardian',
     name: 'AI Smart Glasses',
@@ -41,8 +40,8 @@ const COMPANIES: Company[] = [
 ]
 
 // ─── Card definitions ───────────────────────────────────────────
-type Bullet = { label: string; detail: string }
-type Card = {
+export type Bullet = { label: string; detail: React.ReactNode }
+export type Card = {
   accent: string
   eyebrow: string
   stat: string
@@ -54,7 +53,7 @@ type Card = {
   icon: React.ReactNode
 }
 
-const CARDS: Card[] = [
+export const CARDS: Card[] = [
   {
     accent: '#E8624A',
     eyebrow: 'The Problem',
@@ -112,6 +111,34 @@ const CARDS: Card[] = [
       { label: 'Unified UX', detail: 'Face recognition + captions + summaries in one tap' },
     ],
   },
+  {
+    accent: '#36B37E',
+    eyebrow: 'Validation',
+    stat: '3',
+    statLabel: 'groups confirmed the right segment, product scope, and privacy tradeoffs.',
+    icon: (
+      <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
+        <path d="M8 13h32M8 24h32M8 35h20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M34 32l4 4 7-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    title: 'Built from real feedback.',
+    body: 'DementAI was shaped through three validation conversations before the product direction was narrowed.',
+    bullets: [
+      { 
+        label: 'Neurologist', 
+        detail: <><mark>Not for older or severe dementia</mark>; best scope is <mark>early and mid-stage dementia</mark>.</> 
+      },
+      { 
+        label: 'Psychology', 
+        detail: <><mark>Just two patient actions</mark>; kept the experience simple by removing extra options.</> 
+      },
+      { 
+        label: 'Developers', 
+        detail: <><mark>Privacy-aware SOS flow</mark> replaced the 30-second video recording for simplicity.</> 
+      },
+    ],
+  },
 ]
 
 // ─── Slide variants ─────────────────────────────────────────────
@@ -134,7 +161,7 @@ const MODAL_PANEL = {
 }
 
 // ─── Company detail view ────────────────────────────────────────
-function CompanyDetail({ company, onBack }: { company: Company; onBack: () => void }) {
+export function CompanyDetail({ company, onBack }: { company: Company; onBack: () => void }) {
   const [imageReady, setImageReady] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
 
@@ -245,7 +272,7 @@ function CompanyDetail({ company, onBack }: { company: Company; onBack: () => vo
 }
 
 // ─── Competitor mini-cards ───────────────────────────────────────
-function CompetitorCards({ onSelect }: { onSelect: (id: string) => void }) {
+export function CompetitorCards({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <div className="cc-grid">
       {COMPANIES.map((c) => (

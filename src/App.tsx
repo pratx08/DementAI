@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
 import { LandingPage } from './components/LandingPage'
-import { OnboardingCards } from './components/OnboardingCards'
+import { OnboardingCards, CARDS, CompetitorCards, CompanyDetail, COMPANIES, type Company } from './components/OnboardingCards'
 import { useCamera } from './hooks/useCamera'
 import {
   clearKnownPeople,
@@ -264,13 +264,19 @@ function LoginScreen({
   onSelectRole: (role: UserRole) => void
 }) {
   const [showAbout, setShowAbout] = useState(false)
+  const [aboutIndex, setAboutIndex] = useState(0)
+  const [activeCompany, setActiveCompany] = useState<Company | null>(null)
+  const card = CARDS[aboutIndex]
 
   return (
     <main className="login-shell">
       <button
         className="about-toggle"
         type="button"
-        onClick={() => setShowAbout(true)}
+        onClick={() => {
+          setAboutIndex(0)
+          setShowAbout(true)
+        }}
       >
         About
       </button>
@@ -300,91 +306,104 @@ function LoginScreen({
             className="ob-card about-card"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="validation-title"
+            aria-labelledby="about-title"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="ob-card-grid about-card-grid">
               <div className="ob-card-copy">
                 <div className="ob-header-row">
-                  <span className="ob-eyebrow" style={{ color: '#36B37E' }}>
-                    Validation
+                  <span className="ob-eyebrow" style={{ color: card.accent }}>
+                    {card.eyebrow}
                   </span>
-                  <button
-                    className="about-close"
-                    type="button"
-                    aria-label="Close about card"
-                    onClick={() => setShowAbout(false)}
-                  >
-                    Close
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="ob-step-count">{aboutIndex + 1} / {CARDS.length}</span>
+                    <button
+                      className="about-close"
+                      type="button"
+                      aria-label="Close about card"
+                      onClick={() => setShowAbout(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
 
-                <div className="ob-divider" style={{ background: '#36B37E' }} />
-                <h2 className="ob-title" id="validation-title">
-                  Built from real feedback.
+                <div className="ob-divider" style={{ background: card.accent }} />
+                <h2 className="ob-title" id="about-title">
+                  {card.title}
                 </h2>
                 <p className="ob-body">
-                  DementAI was shaped through three validation conversations before
-                  the product direction was narrowed.
+                  {card.body}
                 </p>
+
+                <div className="about-nav-row">
+                   <button 
+                     className="about-nav-btn" 
+                     disabled={aboutIndex === 0}
+                     onClick={() => setAboutIndex(i => i - 1)}
+                   >
+                     Previous
+                   </button>
+                   <button 
+                     className="about-nav-btn"
+                     disabled={aboutIndex === CARDS.length - 1}
+                     onClick={() => setAboutIndex(i => i + 1)}
+                   >
+                     Next
+                   </button>
+                </div>
               </div>
 
               <div className="ob-card-side">
                 <div className="ob-side-top">
-                  <div className="ob-icon-panel" style={{ color: '#36B37E' }}>
-                    <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
-                      <path d="M8 13h32M8 24h32M8 35h20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                      <path d="M34 32l4 4 7-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                  <div className="ob-icon-panel" style={{ color: card.accent }}>
+                    {card.icon}
                   </div>
 
                   <div className="ob-stat-block">
-                    <span className="ob-stat-number" style={{ color: '#36B37E' }}>3</span>
+                    <span className="ob-stat-number" style={{ color: card.accent }}>{card.stat}</span>
                     <span className="ob-stat-label">
-                      groups confirmed the right segment, product scope, and privacy tradeoffs.
+                      {card.statLabel}
                     </span>
                   </div>
                 </div>
 
-                <ul className="ob-bullets about-bullets">
-                  <li className="ob-bullet">
-                    <span className="ob-bullet-label" style={{ color: '#36B37E' }}>
-                      Neurologist
-                    </span>
-                    <span className="ob-bullet-detail">
-                      <mark>Not for older or severe dementia</mark>; best scope is
-                      <mark> early and mid-stage dementia</mark>.
-                    </span>
-                  </li>
-                  <li className="ob-bullet">
-                    <span className="ob-bullet-label" style={{ color: '#36B37E' }}>
-                      Psychology
-                    </span>
-                    <span className="ob-bullet-detail">
-                      Removed extra patient-side options and kept the experience to
-                      <mark> just two patient actions</mark>.
-                    </span>
-                  </li>
-                  <li className="ob-bullet">
-                    <span className="ob-bullet-label" style={{ color: '#36B37E' }}>
-                      Developers
-                    </span>
-                    <span className="ob-bullet-detail">
-                      Removed 30-second SOS video recording for a
-                      <mark> simpler, more privacy-aware SOS flow</mark>.
-                    </span>
-                  </li>
-                </ul>
+                {card.bullets && (
+                  <ul className="ob-bullets about-bullets">
+                    {card.bullets.map((bullet, i) => (
+                      <li key={i} className="ob-bullet">
+                        <span className="ob-bullet-label" style={{ color: card.accent }}>
+                          {bullet.label}
+                        </span>
+                        <span className="ob-bullet-detail">
+                          {bullet.detail}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {card.showCompetitors && (
+                  <CompetitorCards onSelect={(id) => setActiveCompany(COMPANIES.find(c => c.id === id) ?? null)} />
+                )}
               </div>
             </div>
-              <button
-                className="about-mobile-close"
-                type="button"
-                aria-label="Close about card"
-                onClick={() => setShowAbout(false)}
-              >
-                Close
-              </button>
+
+            {activeCompany && (
+               <CompanyDetail 
+                 company={activeCompany} 
+                 onBack={() => setActiveCompany(null)} 
+               />
+            )}
+
+            <button
+              className="about-mobile-close"
+              type="button"
+              aria-label="Close about card"
+              onClick={() => setShowAbout(false)}
+            >
+              Close
+            </button>
           </section>
         </div>
       )}
