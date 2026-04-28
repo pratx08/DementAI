@@ -86,12 +86,12 @@ type FaceAnchor = {
 
 type CaretakerTab =
   | 'daily-log'
-  | 'unknown-queue'
   | 'visitor-schedule'
   | 'reminders'
   | 'safe-zone'
-  | 'sos-alerts'
   | 'contacts'
+  | 'sos-alerts'
+  | 'unknown-queue'
   | 'cognitive-report'
 
 const groupOptions = ['Family', 'Friends', 'Caregiver', 'Medical', 'Other']
@@ -1372,7 +1372,7 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   // loading screen — the API sync happens in the background.
   const [dashboard, setDashboard] = useState<DashboardState>(getLocalDashboardState)
   const [status, setStatus] = useState('')
-  const [activeTab, setActiveTab] = useState<CaretakerTab>('daily-log')
+  const [activeTab, setActiveTab] = useState<CaretakerTab>('visitor-schedule')
   const [filter, setFilter] = useState('All')
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -2004,13 +2004,12 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
 
 
   const tabs: { id: CaretakerTab; label: string }[] = [
-    { id: 'daily-log', label: 'Daily Log' },
-    { id: 'unknown-queue', label: 'Unknown Queue' },
     { id: 'visitor-schedule', label: 'Visitor Schedule' },
     { id: 'reminders', label: 'Reminders' },
-    { id: 'safe-zone', label: 'Safe Zone' },
-    { id: 'sos-alerts', label: 'SOS' },
+    { id: 'safe-zone', label: 'Safezone' },
     { id: 'contacts', label: 'Contacts' },
+    { id: 'sos-alerts', label: 'SOS' },
+    { id: 'unknown-queue', label: 'Unknown Queue' },
     { id: 'cognitive-report', label: 'Cognitive' },
   ]
 
