@@ -161,6 +161,24 @@ function getWellbeingNote(text: string) {
   return ''
 }
 
+function getQuestionNote(text: string) {
+  if (/\b(weather|temperature|rain|sunny|forecast)\b/i.test(text)) {
+    const day = getDay(text)
+    const time = getTime(text)
+    const when = [day, time].filter(Boolean).join(' at ')
+
+    return when
+      ? `They discussed the weather ${when}`
+      : 'They discussed the weather forecast'
+  }
+
+  if (/\b(where|what|when|who|why|how)\b/i.test(text)) {
+    return `They asked about ${text.replace(/[?]+$/g, '').trim()}`
+  }
+
+  return ''
+}
+
 function dedupe(notes: string[]) {
   const seen = new Set<string>()
   return notes.filter((note) => {
@@ -199,28 +217,27 @@ function lightweightSummary(transcript: string) {
     getMedicineNote(cleaned),
     getVisitNote(cleaned, speaker),
     getWellbeingNote(cleaned),
+    getQuestionNote(cleaned),
   ]).slice(0, 3)
 
   if (notes.length > 0) {
     const detailSentence = finishSentence(notes.join('; '))
-    const contextSentence = speaker
-      ? `${speaker} spoke with the patient and shared practical reassurance, including: ${meaningfulSentence}.`
-      : `The speaker shared a helpful personal update for the memory card: ${meaningfulSentence}.`
+    const transcriptDetail = sentenceCase(meaningfulSentence.replace(/[?]+$/g, '').trim())
+    const hasQuestionSummary = Boolean(getQuestionNote(cleaned))
 
-    return finishSentence(trimSummary(`${detailSentence} ${contextSentence}`))
+    return finishSentence(trimSummary(
+      transcriptDetail && !hasQuestionSummary && transcriptDetail.toLowerCase() !== detailSentence.toLowerCase()
+        ? `${detailSentence} ${transcriptDetail}.`
+        : detailSentence,
+    ))
   }
 
   const compact = sentenceCase(meaningfulSentence
     .replace(/\b(?:it'?s|it is|this is)\s+me,?\s+[a-z][a-z'-]+\.?/i, '')
     .replace(/\byou\b/gi, 'the patient')
     .slice(0, 360))
-  const speakerContext = speaker
-    ? `${speaker} spoke with the patient and gave a clear update from the visit.`
-    : 'The speaker gave the patient a clear update from the visit.'
-  const memoryContext =
-    'This should be shown as a recent memory cue so the patient can reconnect with the topic in the next conversation.'
 
-  return finishSentence(trimSummary(`${speakerContext} ${compact}. ${memoryContext}`))
+  return finishSentence(trimSummary(compact))
 }
 
 export function warmConversationSummarizer() {
