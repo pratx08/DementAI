@@ -297,52 +297,94 @@ function LoginScreen({
           onClick={() => setShowAbout(false)}
         >
           <section
-            className="about-card"
+            className="ob-card about-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="validation-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <header>
-              <p>Validation</p>
-              <h2 id="validation-title">Built from real feedback.</h2>
+            <div className="ob-card-grid about-card-grid">
+              <div className="ob-card-copy">
+                <div className="ob-header-row">
+                  <span className="ob-eyebrow" style={{ color: '#36B37E' }}>
+                    Validation
+                  </span>
+                  <button
+                    className="about-close"
+                    type="button"
+                    aria-label="Close about card"
+                    onClick={() => setShowAbout(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="ob-divider" style={{ background: '#36B37E' }} />
+                <h2 className="ob-title" id="validation-title">
+                  Built from real feedback.
+                </h2>
+                <p className="ob-body">
+                  DementAI was shaped through three validation conversations before
+                  the product direction was narrowed.
+                </p>
+              </div>
+
+              <div className="ob-card-side">
+                <div className="ob-side-top">
+                  <div className="ob-icon-panel" style={{ color: '#36B37E' }}>
+                    <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
+                      <path d="M8 13h32M8 24h32M8 35h20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                      <path d="M34 32l4 4 7-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+
+                  <div className="ob-stat-block">
+                    <span className="ob-stat-number" style={{ color: '#36B37E' }}>3</span>
+                    <span className="ob-stat-label">
+                      groups confirmed the right segment, product scope, and privacy tradeoffs.
+                    </span>
+                  </div>
+                </div>
+
+                <ul className="ob-bullets about-bullets">
+                  <li className="ob-bullet">
+                    <span className="ob-bullet-label" style={{ color: '#36B37E' }}>
+                      Neurologist
+                    </span>
+                    <span className="ob-bullet-detail">
+                      <mark>Not for older or severe dementia</mark>; best scope is
+                      <mark> early and mid-stage dementia</mark>.
+                    </span>
+                  </li>
+                  <li className="ob-bullet">
+                    <span className="ob-bullet-label" style={{ color: '#36B37E' }}>
+                      Psychology
+                    </span>
+                    <span className="ob-bullet-detail">
+                      Removed extra patient-side options and kept the experience to
+                      <mark> just two patient actions</mark>.
+                    </span>
+                  </li>
+                  <li className="ob-bullet">
+                    <span className="ob-bullet-label" style={{ color: '#36B37E' }}>
+                      Developers
+                    </span>
+                    <span className="ob-bullet-detail">
+                      Removed 30-second SOS video recording for a
+                      <mark> simpler, more privacy-aware SOS flow</mark>.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
               <button
+                className="about-mobile-close"
                 type="button"
                 aria-label="Close about card"
                 onClick={() => setShowAbout(false)}
               >
                 Close
               </button>
-            </header>
-
-            <div className="about-stat-row">
-              <strong>3</strong>
-              <span>sets of people shaped the direction before the product was finalised.</span>
-            </div>
-
-            <div className="about-validation-grid">
-              <article>
-                <span>Neurologist</span>
-                <p>
-                  This is <mark>not for older or severe dementia patients</mark>.
-                  The clearest scope is <mark>early and mid-stage dementia</mark>.
-                </p>
-              </article>
-              <article>
-                <span>Psychology students</span>
-                <p>
-                  Patient screens should avoid too many choices. Features like adding
-                  people and a home button were removed, leaving <mark>just two patient actions</mark>.
-                </p>
-              </article>
-              <article>
-                <span>Developer feedback</span>
-                <p>
-                  The original SOS flow recorded and sent a 30-second video. That was
-                  cut to avoid unnecessary capture, making SOS <mark>simpler and more privacy-aware</mark>.
-                </p>
-              </article>
-            </div>
           </section>
         </div>
       )}
