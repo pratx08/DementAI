@@ -12,6 +12,7 @@ export type Company = {
   sourceUrl: string
   /** Drop files into public/competitors/ and Vite serves them at these paths */
   imageSrc: string
+  secondaryImageSrc?: string
   videoSrc: string
   accent: string
 }
@@ -34,6 +35,7 @@ export const COMPANIES: Company[] = [
     sourceLabel: 'Healthcare Digital',
     sourceUrl: 'https://healthcare-digital.com/technology-and-ai/careyayas-medacarellm-ai-glasses-support-dementia-patients',
     imageSrc: assetPath('competitors/careyaya-cover.jpg'),
+    secondaryImageSrc: assetPath('competitors/careyaya-2.jpg'),
     videoSrc: assetPath('competitors/careyaya-video.mp4'),
     accent: '#C471ED',
   },
@@ -205,8 +207,11 @@ const MODAL_PANEL = {
 // ─── Company detail view ────────────────────────────────────────
 export function CompanyDetail({ company, onBack }: { company: Company; onBack: () => void }) {
   const [imageReady, setImageReady] = useState(false)
+  const [secondaryImageReady, setSecondaryImageReady] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
   const showVideo = company.id !== 'careyaya'
+  const showSecondaryImage = Boolean(company.secondaryImageSrc)
+  const hasMultipleMedia = showVideo || showSecondaryImage
 
   return (
     <motion.div
@@ -262,7 +267,7 @@ export function CompanyDetail({ company, onBack }: { company: Company; onBack: (
         <span className="cd-company-tag" style={{ color: company.accent }}>{company.tag}</span>
       </div>
 
-      <div className={`cd-media-grid ${!showVideo ? 'cd-media-grid--single' : ''}`}>
+      <div className={`cd-media-grid ${!hasMultipleMedia ? 'cd-media-grid--single' : ''}`}>
         <div className="cd-media-block">
           <img
             className="cd-image"
@@ -283,6 +288,29 @@ export function CompanyDetail({ company, onBack }: { company: Company; onBack: (
             </div>
           )}
         </div>
+
+        {showSecondaryImage && (
+          <div className="cd-media-block">
+            <img
+              className="cd-image"
+              src={company.secondaryImageSrc}
+              alt={`${company.name} additional view`}
+              onLoad={() => setSecondaryImageReady(true)}
+              onError={() => setSecondaryImageReady(false)}
+            />
+            {!secondaryImageReady && (
+              <div className="cd-image-placeholder" aria-hidden>
+              <svg viewBox="0 0 48 48" fill="none">
+                <rect x="4" y="8" width="40" height="30" rx="4" stroke="currentColor" strokeWidth="1.8" />
+                <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M4 30l10-8 8 6 6-4 16 10" stroke="currentColor" strokeWidth="1.8"
+                  strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Add image to<br /><code>public/competitors/{company.id}-2.jpg</code></span>
+              </div>
+            )}
+          </div>
+        )}
 
         {showVideo && (
           <div className="cd-media-block cd-media-block--video">
