@@ -2413,7 +2413,7 @@ body {
   justify-content: center;
   width: 100%;
   min-height: 100svh;
-  background: #f8fbff;
+  background: #000;
   overflow: hidden;
   padding:
     max(24px, env(safe-area-inset-top))
@@ -2429,12 +2429,12 @@ body {
   inset: -28%;
   z-index: -2;
   background:
-    linear-gradient(118deg, transparent 0 18%, rgba(37, 99, 235, 0.22) 30%, transparent 43%),
-    linear-gradient(42deg, transparent 0 24%, rgba(16, 185, 129, 0.18) 39%, transparent 54%),
-    linear-gradient(152deg, transparent 0 48%, rgba(245, 158, 11, 0.16) 62%, transparent 76%),
-    #f8fbff;
-  filter: blur(58px);
-  opacity: 1;
+    linear-gradient(118deg, transparent 0 18%, rgba(37, 99, 235, 0.42) 30%, transparent 43%),
+    linear-gradient(42deg, transparent 0 24%, rgba(16, 185, 129, 0.34) 39%, transparent 54%),
+    linear-gradient(152deg, transparent 0 48%, rgba(245, 158, 11, 0.26) 62%, transparent 76%),
+    #000;
+  filter: blur(52px);
+  opacity: 0.92;
   transform: rotate(-6deg);
 }
 
@@ -2444,8 +2444,8 @@ body {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.76)),
-    rgba(255, 255, 255, 0.28);
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.58)),
+    rgba(0, 0, 0, 0.24);
   pointer-events: none;
 }
 
@@ -2454,8 +2454,8 @@ body {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255, 255, 255, 0.78), transparent 65%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.66), transparent 32%, transparent 68%, rgba(255, 255, 255, 0.66));
+    radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255, 255, 255, 0.08), transparent 65%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.46), transparent 32%, transparent 68%, rgba(0, 0, 0, 0.46));
   pointer-events: none;
 }
 
