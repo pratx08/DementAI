@@ -263,8 +263,18 @@ function LoginScreen({
 }: {
   onSelectRole: (role: UserRole) => void
 }) {
+  const [showAbout, setShowAbout] = useState(false)
+
   return (
     <main className="login-shell">
+      <button
+        className="about-toggle"
+        type="button"
+        onClick={() => setShowAbout(true)}
+      >
+        About
+      </button>
+
       <section className="login-panel" aria-label="Choose login role">
         <p>DementAI</p>
         <h1>Continue as</h1>
@@ -279,6 +289,63 @@ function LoginScreen({
           </button>
         </div>
       </section>
+
+      {showAbout && (
+        <div
+          className="about-backdrop"
+          role="presentation"
+          onClick={() => setShowAbout(false)}
+        >
+          <section
+            className="about-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="validation-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <p>Validation</p>
+              <h2 id="validation-title">Built from real feedback.</h2>
+              <button
+                type="button"
+                aria-label="Close about card"
+                onClick={() => setShowAbout(false)}
+              >
+                Close
+              </button>
+            </header>
+
+            <div className="about-stat-row">
+              <strong>3</strong>
+              <span>sets of people shaped the direction before the product was finalised.</span>
+            </div>
+
+            <div className="about-validation-grid">
+              <article>
+                <span>Neurologist</span>
+                <p>
+                  This is <mark>not for older or severe dementia patients</mark>.
+                  The clearest scope is <mark>early and mid-stage dementia</mark>.
+                </p>
+              </article>
+              <article>
+                <span>Psychology students</span>
+                <p>
+                  Patient screens should avoid too many choices. Features like adding
+                  people and a home button were removed, leaving <mark>just two patient actions</mark>.
+                </p>
+              </article>
+              <article>
+                <span>Developer feedback</span>
+                <p>
+                  The original SOS flow recorded and sent a 30-second video. That was
+                  cut to avoid unnecessary capture, making SOS <mark>simpler and more privacy-aware</mark>.
+                </p>
+              </article>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
