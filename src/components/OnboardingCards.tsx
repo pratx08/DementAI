@@ -50,10 +50,14 @@ export type Card = {
   body: string
   bullets?: Bullet[]
   showCompetitors?: boolean
+  columns?: {
+    title: string
+    items: string[]
+  }[]
   icon: React.ReactNode
 }
 
-export const CARDS: Card[] = [
+const BASE_CARDS: Card[] = [
   {
     accent: '#E8624A',
     eyebrow: 'The Problem',
@@ -141,6 +145,46 @@ export const VALIDATION_CARD: Card = {
     },
   ],
 }
+
+export const GROWTH_RISK_CARD: Card = {
+  accent: '#F5A623',
+  eyebrow: 'Growth Strategy & Risks',
+  stat: '$30-35',
+  statLabel: 'monthly subscription target before enterprise expansion.',
+  icon: (
+    <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
+      <path d="M8 38h32" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M12 34l9-10 7 6 9-16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M31 14h6v6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  title: 'A clear path to revenue, with known risks.',
+  body: 'DementAI starts with families and caregivers, then expands into enterprise care channels and privacy-safe research partnerships.',
+  columns: [
+    {
+      title: 'Growth Strategy',
+      items: [
+        '$30-35 monthly subscription for families and caregivers.',
+        'Later enterprise model for care homes, clinics, and provider networks.',
+        'Privacy-consented patient interaction data can support studies for pharmaceutical companies.',
+      ],
+    },
+    {
+      title: 'Risks',
+      items: [
+        'Must comply with HIPAA rules for protected health information.',
+        'Face recognition and summarization models need more optimization and validation.',
+        'Some SDKs the product depends on still need stable public releases.',
+      ],
+    },
+  ],
+}
+
+export const CARDS: Card[] = [
+  ...BASE_CARDS,
+  VALIDATION_CARD,
+  GROWTH_RISK_CARD,
+]
 
 // ─── Slide variants ─────────────────────────────────────────────
 const SLIDE = {
@@ -367,6 +411,21 @@ export function OnboardingCards({ onDone }: { onDone: () => void }) {
                     <CompetitorCards
                       onSelect={(id) => setActiveCompany(COMPANIES.find((c) => c.id === id) ?? null)}
                     />
+                  )}
+
+                  {card.columns && (
+                    <div className="ob-column-grid">
+                      {card.columns.map((column) => (
+                        <section className="ob-column" key={column.title}>
+                          <h3>{column.title}</h3>
+                          <ul>
+                            {column.items.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
