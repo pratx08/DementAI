@@ -395,6 +395,34 @@ button {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.image-drop-hint {
+  width: calc(100% - 32px);
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed #93c5fd;
+  border-radius: 8px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  text-align: center;
+  pointer-events: none;
+}
+
+.image-drop-hint strong {
+  font-size: 0.95rem;
+  color: #1e3a8a;
+}
+
+.image-drop-hint small {
+  max-width: 260px;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .capture-panel {
   position: relative;
   display: grid;

@@ -9,7 +9,6 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
-  Bell,
   Calendar,
   FileText,
   History,
@@ -94,7 +93,6 @@ type FaceAnchor = {
 type CaretakerTab =
   | 'daily-log'
   | 'visitor-schedule'
-  | 'reminders'
   | 'safe-zone'
   | 'contacts'
   | 'sos-alerts'
@@ -1362,12 +1360,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const [logFilter, setLogFilter] = useState<'all' | DailyLogEntry['type']>('all')
   const [manualLogTitle, setManualLogTitle] = useState('')
   const [manualLogSummary, setManualLogSummary] = useState('')
-  const [selectedReminderCategory, setSelectedReminderCategory] =
-    useState<ReminderItem['category']>('Medication')
-  const [reminderTitle, setReminderTitle] = useState('')
-  const [reminderMessage, setReminderMessage] = useState('')
-  const [reminderPriority, setReminderPriority] =
-    useState<ReminderItem['priority']>('Medium')
   const [visitorPersonId, setVisitorPersonId] = useState('')
   const [visitorDate, setVisitorDate] = useState('')
   const [visitorContext, setVisitorContext] = useState('')
@@ -1384,11 +1376,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   const [isSavingPhotos, setIsSavingPhotos] = useState(false)
   // Contacts modal
   const [modalPersonId, setModalPersonId] = useState<string | null>(null)
-  // Reminder form
-  const [reminderDatetime, setReminderDatetime] = useState('')
-  const [reminderRecurring, setReminderRecurring] =
-    useState<ReminderItem['recurring']>('none')
-  const [reminderDays, setReminderDays] = useState<number[]>([])
   // SOS expand
   const [expandedSosId, setExpandedSosId] = useState<string | null>(null)
   // Safe zone
@@ -1860,58 +1847,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
     setStatus('Visitor briefing scheduled.')
   }
 
-  function handleAddReminder(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!reminderTitle.trim() || !reminderMessage.trim() || !reminderDatetime) {
-      setStatus('Fill in the title, date/time, and message first.')
-      return
-    }
-
-    const dt = new Date(reminderDatetime)
-    let label = dt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-    if (reminderRecurring === 'daily') label += ' · Daily'
-    else if (reminderRecurring === 'weekdays') label += ' · Weekdays'
-    else if (reminderRecurring === 'weekly') {
-      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-      label += ` · Weekly (${reminderDays.map((d) => dayNames[d]).join(', ')})`
-    }
-
-    updateDashboard((current) => ({
-      ...current,
-      reminders: [
-        {
-          id: createLocalId('reminder'),
-          title: reminderTitle.trim(),
-          category: selectedReminderCategory,
-          scheduleLabel: label,
-          message: reminderMessage.trim(),
-          priority: reminderPriority,
-          datetime: dt.toISOString(),
-          recurring: reminderRecurring,
-          recurringDays: reminderRecurring === 'weekly' ? reminderDays : undefined,
-          status: 'Active',
-        },
-        ...current.reminders,
-      ],
-    }))
-    setReminderTitle('')
-    setReminderMessage('')
-    setReminderDatetime('')
-    setReminderRecurring('none')
-    setReminderDays([])
-    setReminderPriority('Medium')
-    setStatus('Reminder saved.')
-  }
-
-  function handleDeleteReminder(id: string) {
-    updateDashboard((current) => ({
-      ...current,
-      reminders: current.reminders.filter((r) => r.id !== id),
-    }))
-    setStatus('Reminder deleted.')
-  }
-
   function handleSetHomeAddress() {
     if (!homeAddressDraft.trim()) return
     updateDashboard((current) => ({
@@ -1972,7 +1907,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
 
   const tabs: { id: CaretakerTab; label: string; icon: any; description: string }[] = [
     { id: 'visitor-schedule', label: 'Visits', icon: <Calendar size={18} />, description: 'Schedule and manage visitor briefings' },
-    { id: 'reminders', label: 'Reminders', icon: <Bell size={18} />, description: 'Set medication and daily task alerts' },
     { id: 'safe-zone', label: 'Safezone', icon: <Shield size={18} />, description: 'Monitor and define safe boundaries' },
     { id: 'contacts', label: 'Contacts', icon: <Users size={18} />, description: 'Manage face recognition profiles' },
     { id: 'sos-alerts', label: 'SOS', icon: <AlertCircle size={18} />, description: 'Emergency alerts and resolution' },
@@ -2040,9 +1974,10 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                     {imagePreviews.length > 0 ? (
                       <img src={imagePreviews[imagePreviews.length - 1]} alt="" />
                     ) : (
-                      <span>
+                      <span className="image-drop-hint">
                         <Upload size={24} />
-                        Upload or capture face samples
+                        <strong>Click to add face photos</strong>
+                        <small>Upload a clear front-facing image, or use the camera above.</small>
                       </span>
                     )}
                     <input
@@ -2356,91 +2291,6 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                         </div>
                       )
                     })
-                  )}
-                </div>
-              </article>
-            </div>
-          )}
-
-          {/* ── Reminders ── */}
-          {activeTab === 'reminders' && (
-            <div className="dashboard-grid">
-              <form className="panel-card form-card" onSubmit={handleAddReminder}>
-                <div className="panel-head">
-                  <h2>Create reminder</h2>
-                  <p>Fires an overlay on the patient's camera screen at the set time.</p>
-                </div>
-                <label>Title<input value={reminderTitle} onChange={(e) => setReminderTitle(e.target.value)} placeholder="Blood pressure tablet" /></label>
-                <div className="form-grid">
-                  <label>
-                    Category
-                    <select value={selectedReminderCategory} onChange={(e) => setSelectedReminderCategory(e.target.value as ReminderItem['category'])}>
-                      {['Medication', 'Hydration', 'Exercise', 'Call', 'Other'].map((o) => <option key={o}>{o}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Priority
-                    <select value={reminderPriority} onChange={(e) => setReminderPriority(e.target.value as ReminderItem['priority'])}>
-                      {['Low', 'Medium', 'High'].map((o) => <option key={o}>{o}</option>)}
-                    </select>
-                  </label>
-                </div>
-                <label>Date &amp; time<input type="datetime-local" value={reminderDatetime} onChange={(e) => setReminderDatetime(e.target.value)} /></label>
-                <label>
-                  Recurring
-                  <select value={reminderRecurring} onChange={(e) => setReminderRecurring(e.target.value as ReminderItem['recurring'])}>
-                    <option value="none">One-time</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekdays">Weekdays (Mon–Fri)</option>
-                    <option value="weekly">Weekly — pick days</option>
-                  </select>
-                </label>
-                {reminderRecurring === 'weekly' && (
-                  <div className="dow-picker">
-                    {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((day, i) => (
-                      <button
-                        key={day}
-                        type="button"
-                        className={`dow-btn ${reminderDays.includes(i) ? 'is-on' : ''}`}
-                        onClick={() => setReminderDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <label>
-                  Message shown to patient
-                  <textarea value={reminderMessage} onChange={(e) => setReminderMessage(e.target.value)} placeholder="Time for your blood pressure tablet. It's in the kitchen cabinet, top shelf." />
-                </label>
-                <button type="submit">Save reminder</button>
-              </form>
-
-              <article className="panel-card">
-                <div className="panel-head">
-                  <h2>Saved reminders</h2>
-                  <p>{dashboard.reminders.length} reminder{dashboard.reminders.length !== 1 ? 's' : ''} scheduled</p>
-                </div>
-                <div className="stack-list">
-                  {dashboard.reminders.length === 0 ? (
-                    <p className="empty-people">No reminders yet.</p>
-                  ) : (
-                    dashboard.reminders.map((r) => (
-                      <div className="reminder-card" key={r.id}>
-                        <div className="reminder-card-header">
-                          <strong>{r.title}</strong>
-                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                            <span className={`badge badge--${r.priority === 'High' ? 'high' : r.priority === 'Medium' ? 'medium' : 'low'}`}>{r.priority}</span>
-                            <span className={`badge badge--${r.status === 'Active' ? 'active' : r.status === 'Missed' ? 'missed' : 'acknowledged'}`}>{r.status}</span>
-                          </div>
-                        </div>
-                        <span className="reminder-card-meta">{r.category} · {r.scheduleLabel}</span>
-                        <p className="reminder-card-msg">{r.message}</p>
-                        <button type="button" style={{ marginTop: 4, alignSelf: 'start', color: '#8b1a1a', background: '#fde8e8', borderColor: '#f5c6c6', fontSize: '0.8rem', padding: '5px 10px', minHeight: 'unset' }} onClick={() => handleDeleteReminder(r.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    ))
                   )}
                 </div>
               </article>
