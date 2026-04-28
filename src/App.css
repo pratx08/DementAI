@@ -2498,8 +2498,9 @@ button[type="submit"]:hover, .save-person:hover {
 }
 
 .caretaker-status {
-  max-width: 1360px;
-  margin: 14px auto 0;
+  width: 100%;
+  max-width: none;
+  margin: 14px 0 0;
 }
 
 .loading-panel {

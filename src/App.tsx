@@ -2473,11 +2473,11 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </article>
           )}
 
+          {status && <p className="form-status caretaker-status">{status}</p>}
+
           </div>
         </section>
       </div>
-
-      {status && <p className="form-status caretaker-status">{status}</p>}
     </main>
   )
 }
