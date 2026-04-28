@@ -47,7 +47,7 @@ export type Card = {
   stat: string
   statLabel: string
   title: string
-  body: string
+  body?: string
   bullets?: Bullet[]
   showCompetitors?: boolean
   columns?: {
@@ -158,8 +158,7 @@ export const GROWTH_RISK_CARD: Card = {
       <path d="M31 14h6v6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
-  title: 'A clear path to revenue, with known risks.',
-  body: 'DementAI starts with families and caregivers, then expands into enterprise care channels and privacy-safe research partnerships.',
+  title: '',
   columns: [
     {
       title: 'Growth Strategy',
@@ -381,8 +380,8 @@ export function OnboardingCards({ onDone }: { onDone: () => void }) {
                   </div>
 
                   <div className="ob-divider" style={{ background: card.accent }} />
-                  <h2 className="ob-title">{card.title}</h2>
-                  <p className="ob-body">{card.body}</p>
+                  {card.title && <h2 className="ob-title">{card.title}</h2>}
+                  {card.body && <p className="ob-body">{card.body}</p>}
                 </div>
 
                 <div className="ob-card-side">

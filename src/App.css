@@ -164,6 +164,27 @@ button {
   cursor: not-allowed;
 }
 
+.about-nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 42px;
+  margin-top: 24px;
+  padding: 10px 16px;
+  border: 1px solid rgba(245, 166, 35, 0.36);
+  border-radius: 999px;
+  color: #f8fff9;
+  background: rgba(245, 166, 35, 0.12);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.about-nav-arrow:hover {
+  background: rgba(245, 166, 35, 0.2);
+  transform: translateY(-1px);
+}
+
 .about-card .ob-card-grid {
   overflow: hidden;
 }

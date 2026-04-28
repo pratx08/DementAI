@@ -326,12 +326,16 @@ function LoginScreen({
                 </div>
 
                 <div className="ob-divider" style={{ background: card.accent }} />
-                <h2 className="ob-title" id="about-title">
-                  {card.title}
-                </h2>
-                <p className="ob-body">
-                  {card.body}
-                </p>
+                {card.title && (
+                  <h2 className="ob-title" id="about-title">
+                    {card.title}
+                  </h2>
+                )}
+                {card.body && (
+                  <p className="ob-body">
+                    {card.body}
+                  </p>
+                )}
               </div>
 
               <div className="ob-card-side">
@@ -380,19 +384,24 @@ function LoginScreen({
               </div>
             </div>
 
-            <div className="about-nav-row" aria-label="About cards">
-              {aboutCards.map((aboutCard, index) => (
-                <button
-                  className="about-nav-btn"
-                  type="button"
-                  key={aboutCard.eyebrow}
-                  onClick={() => setAboutIndex(index)}
-                  disabled={index === aboutIndex}
-                >
-                  {aboutCard.eyebrow}
-                </button>
-              ))}
-            </div>
+            <button
+              className="about-nav-arrow"
+              type="button"
+              aria-label={aboutIndex === 0 ? 'View growth strategy and risks' : 'Back to validation'}
+              onClick={() => setAboutIndex((index) => (index === 0 ? 1 : 0))}
+            >
+              {aboutIndex === 0 ? (
+                <>
+                  <span>Growth Strategy & Risks</span>
+                  <span aria-hidden>→</span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden>←</span>
+                  <span>Validation</span>
+                </>
+              )}
+            </button>
 
             <button
               className="about-mobile-close"
