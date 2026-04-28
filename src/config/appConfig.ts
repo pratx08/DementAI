@@ -3,8 +3,8 @@ const assetPath = (path: string) =>
 
 export const appConfig = {
   camera: {
-    width: 960,
-    height: 540,
+    width: 640,
+    height: 360,
     frameRate: 60,
   },
   recognition: {
@@ -13,7 +13,7 @@ export const appConfig = {
     peopleStorageKey: 'dementai-known-people',
     dashboardStorageKey: 'dementai-dashboard-state',
     minRecognitionIntervalMs: 650,
-    minTrackingIntervalMs: 70,
+    minTrackingIntervalMs: 100,
     speechPauseMs: 2600,
     captionHoldMs: 1000,
     // Minimum cosine similarity to consider ANY match (Human.js range 0–1).

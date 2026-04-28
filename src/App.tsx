@@ -472,6 +472,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   const [micEnabled, setMicEnabled] = useState(false)
   const [micStatus, setMicStatus] = useState('')
   const [liveFaceSummary, setLiveFaceSummary] = useState<string | null>(null)
+  const [recognitionReady, setRecognitionReady] = useState(false)
   const [activeReminderOverlay, setActiveReminderOverlay] = useState<ReminderItem | null>(null)
   const isNativeApp = Capacitor.isNativePlatform()
   const webSpeech = useSpeechRecognition()
@@ -537,6 +538,36 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       orientation.unlock?.()
     }
   }, [])
+
+  useEffect(() => {
+    let isMounted = true
+    let warmupTimer: number | null = null
+
+    if (isCameraLive && knownPeople.some((person) => person.descriptors.length > 0)) {
+      warmupTimer = window.setTimeout(() => {
+        loadFaceModels()
+          .then(() => {
+            if (isMounted) {
+              setRecognitionReady(true)
+            }
+          })
+          .catch(() => {
+            if (isMounted) {
+              setRecognitionReady(false)
+            }
+          })
+      }, 800)
+    } else {
+      setRecognitionReady(false)
+    }
+
+    return () => {
+      isMounted = false
+      if (warmupTimer) {
+        window.clearTimeout(warmupTimer)
+      }
+    }
+  }, [isCameraLive, knownPeople])
 
   useEffect(() => {
     faceAnchorRef.current = faceAnchor
@@ -616,6 +647,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => {
     let isMounted = true
+    let warmupTimer: number | null = null
 
     async function prepareTracking() {
       try {
@@ -632,19 +664,24 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       }
     }
 
-    prepareTracking()
+    if (isCameraLive) {
+      warmupTimer = window.setTimeout(prepareTracking, 250)
+    }
 
     return () => {
       isMounted = false
+      if (warmupTimer) {
+        window.clearTimeout(warmupTimer)
+      }
     }
-  }, [])
+  }, [isCameraLive])
 
   useEffect(() => {
     let isMounted = true
 
     async function prepareRecognition() {
       try {
-        const [people] = await Promise.all([loadKnownPeople(), loadFaceModels()])
+        const people = await loadKnownPeople()
 
         if (isMounted) {
           setKnownPeople(people)
@@ -657,7 +694,6 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
     }
 
     prepareRecognition()
-
     async function refreshKnownPeople() {
       try {
         const people = await loadKnownPeople()
@@ -1075,6 +1111,11 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
   ])
 
   useEffect(() => {
+    if (!isCameraLive) {
+      setFaceAnchor(null)
+      return
+    }
+
     let isCancelled = false
 
     async function trackFace() {
@@ -1100,7 +1141,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       }
     }
 
-    trackFace()
+    trackingTimerRef.current = window.setTimeout(trackFace, 250)
 
     return () => {
       isCancelled = true
@@ -1108,9 +1149,18 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         window.clearTimeout(trackingTimerRef.current)
       }
     }
-  }, [isMirrored, videoEl])
+  }, [isCameraLive, isMirrored, videoEl])
 
   useEffect(() => {
+    if (
+      !isCameraLive ||
+      !recognitionReady ||
+      !knownPeople.some((person) => person.descriptors.length > 0)
+    ) {
+      consecutiveMatchRef.current = null
+      return
+    }
+
     let isCancelled = false
 
     async function scan() {
@@ -1170,7 +1220,10 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
       }
     }
 
-    scan()
+    recognitionTimerRef.current = window.setTimeout(
+      scan,
+      appConfig.recognition.minRecognitionIntervalMs,
+    )
 
     return () => {
       isCancelled = true
@@ -1178,7 +1231,7 @@ function PatientExperience({ onLogout }: { onLogout: () => void }) {
         window.clearTimeout(recognitionTimerRef.current)
       }
     }
-  }, [knownPeople, videoEl])
+  }, [isCameraLive, knownPeople, recognitionReady, videoEl])
 
   function handlePatientSos() {
     const transcript = captionText.trim()

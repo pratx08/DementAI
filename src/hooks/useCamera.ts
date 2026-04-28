@@ -38,16 +38,26 @@ export function useCamera(initialFacingMode: CameraFacingMode = 'user') {
         }
 
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: facingMode },
-              width: { ideal: appConfig.camera.width },
-              height: { ideal: appConfig.camera.height },
-              frameRate: {
-                ideal: appConfig.camera.frameRate,
-                max: appConfig.camera.frameRate,
-              },
+          video.muted = true
+          video.autoplay = true
+          video.playsInline = true
+
+          const videoConstraints: MediaTrackConstraints & {
+            resizeMode?: string
+          } = {
+            facingMode: { ideal: facingMode },
+            width: { ideal: appConfig.camera.width },
+            height: { ideal: appConfig.camera.height },
+            frameRate: {
+              min: 30,
+              ideal: appConfig.camera.frameRate,
+              max: appConfig.camera.frameRate,
             },
+            resizeMode: 'crop-and-scale',
+          }
+
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
             audio: false,
           })
         } catch {
