@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
 import { LandingPage } from './components/LandingPage'
-import { OnboardingCards, CARDS, CompetitorCards, CompanyDetail, COMPANIES, type Company } from './components/OnboardingCards'
+import { OnboardingCards, VALIDATION_CARD } from './components/OnboardingCards'
 import { useCamera } from './hooks/useCamera'
 import {
   clearKnownPeople,
@@ -264,19 +264,14 @@ function LoginScreen({
   onSelectRole: (role: UserRole) => void
 }) {
   const [showAbout, setShowAbout] = useState(false)
-  const [aboutIndex, setAboutIndex] = useState(0)
-  const [activeCompany, setActiveCompany] = useState<Company | null>(null)
-  const card = CARDS[aboutIndex]
+  const card = VALIDATION_CARD
 
   return (
     <main className="login-shell">
       <button
         className="about-toggle"
         type="button"
-        onClick={() => {
-          setAboutIndex(3)
-          setShowAbout(true)
-        }}
+        onClick={() => setShowAbout(true)}
       >
         About
       </button>
@@ -298,12 +293,12 @@ function LoginScreen({
 
       {showAbout && (
         <div
-          className="about-backdrop"
+          className="about-backdrop about-backdrop-fullscreen"
           role="presentation"
           onClick={() => setShowAbout(false)}
         >
           <section
-            className="ob-card about-card"
+            className="ob-card about-card about-card-fullscreen"
             role="dialog"
             aria-modal="true"
             aria-labelledby="about-title"
@@ -315,17 +310,14 @@ function LoginScreen({
                   <span className="ob-eyebrow" style={{ color: card.accent }}>
                     {card.eyebrow}
                   </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span className="ob-step-count">{aboutIndex + 1} / {CARDS.length}</span>
-                    <button
-                      className="about-close"
-                      type="button"
-                      aria-label="Close about card"
-                      onClick={() => setShowAbout(false)}
-                    >
-                      Close
-                    </button>
-                  </div>
+                  <button
+                    className="about-close"
+                    type="button"
+                    aria-label="Close about card"
+                    onClick={() => setShowAbout(false)}
+                  >
+                    Close
+                  </button>
                 </div>
 
                 <div className="ob-divider" style={{ background: card.accent }} />
@@ -335,23 +327,6 @@ function LoginScreen({
                 <p className="ob-body">
                   {card.body}
                 </p>
-
-                <div className="about-nav-row">
-                   <button 
-                     className="about-nav-btn" 
-                     disabled={aboutIndex === 0}
-                     onClick={() => setAboutIndex(i => i - 1)}
-                   >
-                     Previous
-                   </button>
-                   <button 
-                     className="about-nav-btn"
-                     disabled={aboutIndex === CARDS.length - 1}
-                     onClick={() => setAboutIndex(i => i + 1)}
-                   >
-                     Next
-                   </button>
-                </div>
               </div>
 
               <div className="ob-card-side">
@@ -382,19 +357,8 @@ function LoginScreen({
                     ))}
                   </ul>
                 )}
-
-                {card.showCompetitors && (
-                  <CompetitorCards onSelect={(id) => setActiveCompany(COMPANIES.find(c => c.id === id) ?? null)} />
-                )}
               </div>
             </div>
-
-            {activeCompany && (
-               <CompanyDetail 
-                 company={activeCompany} 
-                 onBack={() => setActiveCompany(null)} 
-               />
-            )}
 
             <button
               className="about-mobile-close"

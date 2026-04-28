@@ -111,35 +111,36 @@ export const CARDS: Card[] = [
       { label: 'Unified UX', detail: 'Face recognition + captions + summaries in one tap' },
     ],
   },
-  {
-    accent: '#36B37E',
-    eyebrow: 'Validation',
-    stat: '3',
-    statLabel: 'groups confirmed the right segment, product scope, and privacy tradeoffs.',
-    icon: (
-      <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
-        <path d="M8 13h32M8 24h32M8 35h20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-        <path d="M34 32l4 4 7-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    title: 'Built from real feedback.',
-    body: 'DementAI was shaped through three validation conversations before the product direction was narrowed.',
-    bullets: [
-      { 
-        label: 'Neurologist', 
-        detail: 'Not for older or severe dementia; best scope is early and mid-stage dementia.' 
-      },
-      { 
-        label: 'Psychology', 
-        detail: 'Just two patient actions; kept the experience simple by removing extra options.' 
-      },
-      { 
-        label: 'Developers', 
-        detail: 'Privacy-aware SOS flow replaced the 30-second video recording for simplicity.' 
-      },
-    ],
-  },
 ]
+
+export const VALIDATION_CARD: Card = {
+  accent: '#36B37E',
+  eyebrow: 'Validation',
+  stat: '3',
+  statLabel: 'groups confirmed the right segment, product scope, and privacy tradeoffs.',
+  icon: (
+    <svg viewBox="0 0 48 48" fill="none" className="ob-icon" aria-hidden>
+      <path d="M8 13h32M8 24h32M8 35h20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M34 32l4 4 7-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  title: 'Built from real feedback.',
+  body: 'DementAI was shaped through three validation conversations before the product direction was narrowed.',
+  bullets: [
+    { 
+      label: 'Neurologist', 
+      detail: 'Not for older or severe dementia; best scope is early and mid-stage dementia.' 
+    },
+    { 
+      label: 'Psychology', 
+      detail: 'Just two patient actions; kept the experience simple by removing extra options.' 
+    },
+    { 
+      label: 'Developers', 
+      detail: 'Privacy-aware SOS flow replaced the 30-second video recording for simplicity.' 
+    },
+  ],
+}
 
 // ─── Slide variants ─────────────────────────────────────────────
 const SLIDE = {

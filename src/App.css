@@ -157,6 +157,27 @@ button {
   cursor: not-allowed;
 }
 
+.about-backdrop-fullscreen {
+  z-index: 1000;
+  background: #031009;
+}
+
+.about-card-fullscreen {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: #031009 !important;
+}
+
+.about-card-fullscreen .ob-card-grid {
+  height: 100vh;
+  padding: 40px;
+}
+
 .login-panel {
   width: min(620px, 100%);
   padding: clamp(24px, 5vw, 42px);
