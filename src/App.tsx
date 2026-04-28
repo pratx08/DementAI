@@ -1971,15 +1971,11 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                   </section>
 
                   <label className="image-drop">
-                    {imagePreviews.length > 0 ? (
-                      <img src={imagePreviews[imagePreviews.length - 1]} alt="" />
-                    ) : (
-                      <span className="image-drop-hint">
-                        <Upload size={24} />
-                        <strong>Click to add face photos</strong>
-                        <small>Upload a clear front-facing image, or use the camera above.</small>
-                      </span>
-                    )}
+                    <span className="image-drop-hint">
+                      <Upload size={24} />
+                      <strong>Click to add face photos</strong>
+                      <small>Upload a clear front-facing image, or use the camera above.</small>
+                    </span>
                     <input
                       type="file"
                       accept="image/*"

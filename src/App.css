@@ -386,9 +386,11 @@ button {
 
 .image-drop {
   position: relative;
-  display: grid;
+  display: flex;
   min-height: 210px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
   overflow: hidden;
   border: 1px dashed rgba(211, 255, 224, 0.34);
   border-radius: 8px;
@@ -396,8 +398,8 @@ button {
 }
 
 .image-drop-hint {
-  width: calc(100% - 32px);
-  min-height: 150px;
+  width: 100%;
+  min-height: 156px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -409,6 +411,10 @@ button {
   background: #eff6ff;
   text-align: center;
   pointer-events: none;
+}
+
+.image-drop-hint svg {
+  color: #3b82f6;
 }
 
 .image-drop-hint strong {
