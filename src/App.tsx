@@ -5,11 +5,21 @@ import WebSpeechRecognition, {
   useSpeechRecognition,
 } from 'react-speech-recognition'
 import {
+  Activity,
+  AlertCircle,
   AlertTriangle,
   ArrowLeft,
+  Bell,
+  Calendar,
+  FileText,
+  History,
+  Layout,
+  LogOut,
   Mic,
   MicOff,
+  Shield,
   Upload,
+  Users,
 } from 'lucide-react'
 import { appConfig } from './config/appConfig'
 import { LandingPage } from './components/LandingPage'
@@ -1961,41 +1971,69 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
   }
 
 
-  const tabs: { id: CaretakerTab; label: string }[] = [
-    { id: 'visitor-schedule', label: 'Visitor Schedule' },
-    { id: 'reminders', label: 'Reminders' },
-    { id: 'safe-zone', label: 'Safezone' },
-    { id: 'contacts', label: 'Contacts' },
-    { id: 'sos-alerts', label: 'SOS' },
-    { id: 'cognitive-report', label: 'Cognitive' },
+  const tabs: { id: CaretakerTab; label: string; icon: any; description: string }[] = [
+    { id: 'visitor-schedule', label: 'Visits', icon: <Calendar size={18} />, description: 'Schedule and manage visitor briefings' },
+    { id: 'reminders', label: 'Reminders', icon: <Bell size={18} />, description: 'Set medication and daily task alerts' },
+    { id: 'safe-zone', label: 'Safezone', icon: <Shield size={18} />, description: 'Monitor and define safe boundaries' },
+    { id: 'contacts', label: 'Contacts', icon: <Users size={18} />, description: 'Manage face recognition profiles' },
+    { id: 'sos-alerts', label: 'SOS', icon: <AlertCircle size={18} />, description: 'Emergency alerts and resolution' },
+    { id: 'cognitive-report', label: 'Cognitive', icon: <Activity size={18} />, description: 'AI-detected cognitive observations' },
+    { id: 'daily-log', label: 'History', icon: <History size={18} />, description: 'Activity feed and caretaker notes' },
   ]
+
+  const activeTabInfo = tabs.find(t => t.id === activeTab)
 
   return (
     <main className="caretaker-shell">
-      <nav className="caretaker-header" aria-label="Caretaker navigation">
+      <nav className="caretaker-header">
+        <div className="header-brand">
+          <div className="brand-icon">
+            <Layout size={20} />
+          </div>
+          <div>
+            <h1>Caretaker Portal</h1>
+            <p>DementAI Clinical Assistant</p>
+          </div>
+        </div>
         <div className="header-actions">
-          <button type="button" onClick={onLogout}>
-            <ArrowLeft size={17} />
-            Back
+          <button className="logout-btn" type="button" onClick={onLogout}>
+            <LogOut size={16} />
+            Sign Out
           </button>
         </div>
       </nav>
 
-      <section className="caretaker-workspace">
-        <aside className="tab-sidebar">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`tab-button ${activeTab === tab.id ? 'is-active' : ''}`}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
+      <div className="caretaker-layout-container">
+        <aside className="caretaker-sidebar">
+          <div className="sidebar-nav">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`sidebar-item ${activeTab === tab.id ? 'is-active' : ''}`}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <span className="item-icon">{tab.icon}</span>
+                <div className="item-text">
+                  <span className="item-label">{tab.label}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </aside>
 
-        <section className="tab-panel">
+        <section className="caretaker-main">
+          <header className="main-header">
+            <div className="header-title-row">
+              <div className="header-icon-box">{activeTabInfo?.icon}</div>
+              <div>
+                <h2>{activeTabInfo?.label}</h2>
+                <p>{activeTabInfo?.description}</p>
+              </div>
+            </div>
+          </header>
+
+          <div className="main-content">
 
           {/* ── Contacts ── */}
           {activeTab === 'contacts' && (
@@ -2242,12 +2280,20 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             <div className="dashboard-grid">
               <article className="panel-card">
                 <div className="panel-head">
-                  <h2>Activity feed</h2>
-                  <p>Auto-logged face encounters, SOS events, reminders, and caretaker notes.</p>
+                  <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <History size={18} /> Activity Feed
+                  </h2>
+                  <p>Auto-logged encounters, alerts, and system notes.</p>
                 </div>
-                <div className="filter-row" style={{ marginBottom: 8 }}>
+                <div className="pill-row" style={{ marginBottom: 4 }}>
                   {(['all', 'encounter', 'reminder', 'sos', 'note'] as const).map((option) => (
-                    <button key={option} type="button" aria-pressed={logFilter === option} onClick={() => setLogFilter(option)}>
+                    <button
+                      key={option}
+                      className={`sidebar-item ${logFilter === option ? 'is-active' : ''}`}
+                      style={{ padding: '6px 12px', width: 'auto', minHeight: 'unset', fontSize: '0.8rem', textTransform: 'capitalize' }}
+                      type="button"
+                      onClick={() => setLogFilter(option)}
+                    >
                       {option}
                     </button>
                   ))}
@@ -2262,9 +2308,11 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
                           <strong>{entry.title}</strong>
                           <span className={`badge badge--${entry.type === 'sos' ? 'high' : entry.type === 'encounter' ? 'low' : 'pending'}`}>{entry.type}</span>
                         </div>
-                        <span style={{ fontSize: '0.8rem', color: '#5d7b92' }}>{formatDateTime(entry.occurredAt)}</span>
-                        <p>{entry.summary}</p>
-                        {entry.sentiment && <span className={`badge badge--${entry.sentiment === 'Positive' ? 'low' : entry.sentiment === 'Confused' ? 'medium' : 'pending'}`}>{entry.sentiment}</span>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{formatDateTime(entry.occurredAt)}</span>
+                          {entry.sentiment && <span className={`badge badge--${entry.sentiment === 'Positive' ? 'low' : entry.sentiment === 'Confused' ? 'medium' : 'pending'}`}>{entry.sentiment}</span>}
+                        </div>
+                        <p style={{ marginTop: 8, fontSize: '0.9rem', color: '#475569', lineHeight: 1.5 }}>{entry.summary}</p>
                       </div>
                     ))
                   )}
@@ -2273,7 +2321,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
 
               <form className="panel-card form-card" onSubmit={handleAddManualLog}>
                 <div className="panel-head">
-                  <h2>Add caretaker note</h2>
+                  <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <FileText size={18} /> Add Caretaker Note
+                  </h2>
                   <p>Record manual observations alongside the auto feed.</p>
                 </div>
                 <label>Title<input value={manualLogTitle} onChange={(e) => setManualLogTitle(e.target.value)} placeholder="Evening routine check" /></label>
@@ -2599,8 +2649,9 @@ function CaretakerDashboard({ onLogout }: { onLogout: () => void }) {
             </article>
           )}
 
+          </div>
         </section>
-      </section>
+      </div>
 
       {status && <p className="form-status caretaker-status">{status}</p>}
     </main>
